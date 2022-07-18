@@ -30,22 +30,22 @@ class Calibrate(PythonAlgorithm):
         """Load a rebin a tube calibration run."""
         # check to see if have this file already loaded
         ws_name = os.path.splitext(data_file)[0]
-        print("look for:  {}".format(ws_name))
+        self.log().debug("look for:  {}".format(ws_name))
         try:
             ws = mtd[ws_name]
-            print("Using existing {} workspace".format(ws_name))
+            self.log().information("Using existing {} workspace".format(ws_name))
             return ws
         except:
             pass
         try:
             ws = Load(Filename="saved_" + data_file, OutputWorkspace=ws_name)
-            print(("Loaded saved file from {}.".format("saved_" + data_file)))
+            self.log().information("Loaded saved file from {}.".format("saved_" + data_file))
             return ws
         except:
             pass
 
         ws = Load(Filename=data_file, OutputWorkspace=ws_name)
-        print(("Loaded and integrating data from {}.".format(data_file)))
+        self.log().information("Loaded and integrating data from {}.".format(data_file))
         # turn event mode into histogram with a single bin
         ws = Rebin(ws, self.timebin, PreserveEvents=False)
         # else for histogram data use integration or sumpsectra
