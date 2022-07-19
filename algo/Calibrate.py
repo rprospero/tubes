@@ -1,6 +1,6 @@
 from mantid.kernel import *
 from mantid.api import *
-from mantid.simpleapi import Load, Rebin, SaveNexusProcessed, RenameWorkspace
+from mantid.simpleapi import Load, Rebin, SaveNexusProcessed, RenameWorkspace, CropWorkspace, Scale
 
 import numpy as np
 import os.path
@@ -69,6 +69,8 @@ class Calibrate(PythonAlgorithm):
                               "260=SANS2D00064388.nxs"],
                              direction=Direction.Input,
                              doc="Which strip positions were used for which runs")
+        self.declareProperty('Rear Detector', True, direction=Direction.Input,
+                             doc="Whether to use the front or rear detector.")
         self.declareProperty('Threshold', 600, direction=Direction.Input,
                              doc="Threshold is the number of counts past which we class something as an edge.  This is quite sensitive to change, since we sometimes end up picking.")
         self.declareProperty('Starting Pixel', 20, direction=Direction.Input,
@@ -93,6 +95,15 @@ class Calibrate(PythonAlgorithm):
         self.STARTPIXEL = self.getProperty("Starting Pixel").value
         self.ENDPIXEL = self.getProperty("Ending Pixel").value
         self.FITEDGES = self.getProperty("Fit Edges").value
+        self.rear = self.getProperty("Rear Detector").value
+
+
+        if self.rear:
+            index1 = 0
+            index2 = 120 * 512 - 1
+        else:
+            index1 = 120*512
+            index2 = 2*120*512 -1
 
         data_files = [self._parse_strip(x) for x in self.getProperty("Strip positions").value]
 
@@ -100,6 +111,19 @@ class Calibrate(PythonAlgorithm):
         data_files = [x[1] for x in data_files]
 
         ws_list = [self.get_integrated_workspace(data_file) for data_file in data_files]
+
+        # Scale workspaces
+        i = 0
+        def charge(ws):
+            return mtd[ws].getRun()["proton_charge_by_period"].value
+
+        uamphr_to_rescale = charge(data_files[0].split('.')[0])
+        for ws in data_files:
+            ws2 = ws.split('.')[0]
+            CropWorkspace(InputWorkspace=ws2, OutputWorkspace=ws2 + '_scaled', StartWorkspaceIndex=index1,
+                        EndWorkspaceIndex=index2)
+            Scale(uamphr_to_rescale / charge(ws2), "Multiply", InputWorkspace=ws2 + '_scaled', OutputWorkspace=ws2 + '_scaled')
+            i += 1
 
 # Register algorithm with Mantid
 AlgorithmFactory.subscribe(Calibrate)
