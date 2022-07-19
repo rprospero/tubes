@@ -77,9 +77,6 @@ class Calibrate(PythonAlgorithm):
                              doc="Upper bound of detector's active region")
         self.declareProperty('Fit Edges', False, direction=Direction.Input,
                              doc="FIXME: Fit the full edge of a shadow, instead of just the top and bottom.")
-        self.declareProperty('Use Saved Files', False, direction=Direction.Input,
-                             doc="Use a preprocessed saved file, instead of manually rebinning.")
-
         self.declareProperty('Time bins', '5000,93000,98000', direction=Direction.Input,
                              doc="Time of flight bins to use")
         self.declareProperty('Background', 10, direction=Direction.Input,
@@ -96,7 +93,6 @@ class Calibrate(PythonAlgorithm):
         self.STARTPIXEL = self.getProperty("Starting Pixel").value
         self.ENDPIXEL = self.getProperty("Ending Pixel").value
         self.FITEDGES = self.getProperty("Fit Edges").value
-        self.USESAVEDFILES = self.getProperty("Use Saved Files").value
 
         data_files = [self._parse_strip(x) for x in self.getProperty("Strip positions").value]
 
