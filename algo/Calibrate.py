@@ -2,8 +2,20 @@ from mantid.kernel import *
 from mantid.api import *
 from mantid.simpleapi import Load, Rebin, SaveNexusProcessed, RenameWorkspace, CropWorkspace, Scale
 
+import itertools
 import numpy as np
 import os.path
+import copy
+import sys
+
+INF = sys.float_info.max # Convenient approximation for infinity
+
+def pairwise(iterable):
+    """Helper function from: http://docs.python.org/2/library/itertools.html:
+    s -> (s0,s1), (s1,s2), (s2, s3), ..."""
+    a, b = itertools.tee(iterable)
+    next(b, None)
+    return list(zip(a, b))
 
 class Calibrate(PythonAlgorithm):
     _strip_edges = {
@@ -25,9 +37,26 @@ class Calibrate(PythonAlgorithm):
         return (int(parts[0]), parts[1])
 
 
+    @staticmethod
+    def set_counts_to_one_between_x_range(ws, x_1, x_2):
+        """"""
+        if x_1 > x_2: x_1, x_2 = x_2, x_1
+        for wsIndex in range(ws.getNumberHistograms()):
+            try:
+                if x_1 < ws.getDetector(wsIndex).getPos().getX() < x_2:
+                    ws.dataY(wsIndex)[0] = 1
+            except RuntimeError:
+                break
+                # pass # Ignore "Detector with ID _____ not found" errors.
+
+    def set_counts_to_one_outside_x_range(self, ws, x_1, x_2):
+        """"""
+        if x_1 > x_2: x_1, x_2 = x_2, x_1
+        self.set_counts_to_one_between_x_range(ws, -INF, x_1)
+        self.set_counts_to_one_between_x_range(ws, x_2, INF)
 
     def get_integrated_workspace(self, data_file):
-        """Load a rebin a tube calibration run."""
+        """Load a rebin a tube calibration run.  Searched multiple levels of cache to ensure faster loading."""
         # check to see if have this file already loaded
         ws_name = os.path.splitext(data_file)[0]
         self.log().debug("look for:  {}".format(ws_name))
@@ -55,6 +84,31 @@ class Calibrate(PythonAlgorithm):
 
         return ws
 
+
+    @staticmethod
+    def get_merged_edge_pairs_and_boundaries(edge_pairs):
+        """Merge overlapping edge pairs, then return the merged edges and the midpoint of each edge pair."""
+        #FIXME: There's probably a cleaner way to do this. ALW 2022
+        boundaries = [-INF]
+        edge_pairs_merged = []
+
+        temp = edge_pairs[0]
+
+        for start, end in sorted([sorted(edge_pair) for edge_pair in edge_pairs]):
+            if start <= temp[1]:
+                boundary = start + (temp[1] - start) / 2
+                temp[1] = max(temp[1], end)
+                if start != temp[0]:
+                    boundaries.append(boundary)
+            else:
+                boundaries.append(temp[1] + (start - temp[1]) / 2)
+                edge_pairs_merged.append(tuple(temp))
+                temp[0] = start
+                temp[1] = end
+        edge_pairs_merged.append(tuple(temp))
+        boundaries.append(INF)
+
+        return edge_pairs_merged, boundaries
 
     def category(self):
         return 'SANS\\TubeCalibration'
@@ -124,6 +178,19 @@ class Calibrate(PythonAlgorithm):
                         EndWorkspaceIndex=index2)
             Scale(uamphr_to_rescale / charge(ws2), "Multiply", InputWorkspace=ws2 + '_scaled', OutputWorkspace=ws2 + '_scaled')
             i += 1
+
+
+        known_left_edge_pairs = copy.copy(known_edge_pairs)
+
+        _, boundaries = self.get_merged_edge_pairs_and_boundaries(known_edge_pairs)
+        known_left_edges, _ = self.get_merged_edge_pairs_and_boundaries(known_left_edge_pairs)
+
+
+        for ws, (boundary_start, boundary_end) in zip(ws_list, pairwise(boundaries)):
+            print(("Isolating shadow in %s between boundaries %g and %g." % (str(ws), boundary_start, boundary_end)))
+            # set to 1 so that we can multiply all the shadows together, instead of running merged workspace 5 times.
+            ws2 = str(ws) + '_scaled'
+            self.set_counts_to_one_outside_x_range(mtd[ws2], boundary_start, boundary_end)
 
 # Register algorithm with Mantid
 AlgorithmFactory.subscribe(Calibrate)
