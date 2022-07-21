@@ -121,7 +121,7 @@ class Calibrate(PythonAlgorithm):
         self.set_counts_to_one_between_x_range(ws, -INF, x_1)
         self.set_counts_to_one_between_x_range(ws, x_2, INF)
 
-    def get_integrated_workspace(self, data_file):
+    def get_integrated_workspace(self, data_file, prog):
         """Load a rebin a tube calibration run.  Searched multiple levels of cache to ensure faster loading."""
         # check to see if have this file already loaded
         ws_name = os.path.splitext(data_file)[0]
@@ -129,12 +129,14 @@ class Calibrate(PythonAlgorithm):
         try:
             ws = mtd[ws_name]
             self.log().information("Using existing {} workspace".format(ws_name))
+            prog.report("Loading {}".format(ws_name))
             return ws
         except:
             pass
         try:
             ws = Load(Filename="saved_" + data_file, OutputWorkspace=ws_name)
             self.log().information("Loaded saved file from {}.".format("saved_" + data_file))
+            prog.report("Loading {}".format(ws_name))
             return ws
         except:
             pass
@@ -148,6 +150,7 @@ class Calibrate(PythonAlgorithm):
         SaveNexusProcessed(ws, "saved_" + data_file)
         RenameWorkspace(ws, ws_name)
 
+        prog.report("Loading {}".format(ws_name))
         return ws
 
 
@@ -235,7 +238,8 @@ class Calibrate(PythonAlgorithm):
         known_edge_pairs = np.array([self._strip_edges[x[0]] for x in data_files])
         data_files = [x[1] for x in data_files]
 
-        ws_list = [self.get_integrated_workspace(data_file) for data_file in data_files]
+        load_report = Progress(self, start=0, end=0.9, nreports=len(data_files))
+        ws_list = [self.get_integrated_workspace(data_file, load_report) for data_file in data_files]
 
         # Scale workspaces
         i = 0
@@ -284,11 +288,13 @@ class Calibrate(PythonAlgorithm):
         # caltable = True
         diag_output = dict()
 
+        tube_report = Progress(self, start=0.9, end=1.0, nreports=120)
         for tube_id in range(120):
             # for tube_id in range(116,120):
             diag_output[tube_id] = []
 
             tube_name = self.get_tube_name(tube_id, detector_name)
+            tube_report.report("Calculating tube {}".format(tube_name))
             print("\n==================================================")
             print(("ID = %i, Name = \"%s\"" % (tube_id, tube_name)))
             known_edges1 = copy.copy(known_edges_left)
