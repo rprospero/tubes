@@ -1,6 +1,6 @@
 from mantid.kernel import *
 from mantid.api import *
-from mantid.simpleapi import Load, Rebin, SaveNexusProcessed, RenameWorkspace, CropWorkspace, Scale, CloneWorkspace, Multiply
+from mantid.simpleapi import Load, Rebin, SaveNexusProcessed, RenameWorkspace, CropWorkspace, Scale, CloneWorkspace, Multiply, ApplyCalibration, CreateEmptyTableWorkspace
 
 import itertools
 import numpy as np
@@ -9,6 +9,8 @@ import copy
 import sys
 
 from tube_spec import TubeSpec
+from tube_calib_fit_params import TubeCalibFitParams
+import tube_RKH
 
 class TubeSide:
     LEFT = "left"
@@ -191,6 +193,8 @@ class Calibrate(PythonAlgorithm):
                              doc="Whether to use the front or rear detector.")
         self.declareProperty('Threshold', 600, direction=Direction.Input,
                              doc="Threshold is the number of counts past which we class something as an edge.  This is quite sensitive to change, since we sometimes end up picking.")
+        self.declareProperty('Margin', 25, direction=Direction.Input,
+                             doc="FIXME: Detector margin")
         self.declareProperty('Starting Pixel', 20, direction=Direction.Input,
                              doc="Lower bound of detector's active region")
         self.declareProperty('Ending Pixel', 495, direction=Direction.Input,
@@ -208,11 +212,12 @@ class Calibrate(PythonAlgorithm):
         # Run the algorithm
         self.BACKGROUND = self.getProperty("Background").value
         self.timebin = self.getProperty("Time Bins").value
+        margin = self.getProperty("Margin").value
         OFF_VERTICAL = self.getProperty("Vertical Offset").value
         THRESHOLD = self.getProperty("Threshold").value
         STARTPIXEL = self.getProperty("Starting Pixel").value
         ENDPIXEL = self.getProperty("Ending Pixel").value
-        self.FITEDGES = self.getProperty("Fit Edges").value
+        FITEDGES = self.getProperty("Fit Edges").value
         self.rear = self.getProperty("Rear Detector").value
 
 
@@ -306,6 +311,145 @@ class Calibrate(PythonAlgorithm):
 
             print(), print((len(guessed_pixels), guessed_pixels))
             print(), print((len(known_edges), known_edges))
+
+            # note funcForm==2 fits an edge using error function, (see SANS2DEndErfc above, and code in tube_calib_RKH.py,) while any other value fits a Gaussian
+            if FITEDGES:
+                funcForm = [2] * len(guessed_pixels)
+                fitPar = TubeCalibFitParams(guessed_pixels, outEdge=10.0, inEdge=10.0)
+            else:
+                # average pairs of edges for single peak fit, could in principle do only some tubes or parts of tubes this way!
+                guess = []
+                known = []
+                for i in range(0, len(guessed_pixels), 2):
+                    guess.append((guessed_pixels[i] + guessed_pixels[i + 1]) / 2)
+                    known.append((known_edges[i] + known_edges[i + 1]) / 2)
+                funcForm = [3] * len(guess)
+                guessed_pixels = guess
+                known_edges = known
+                fitPar = TubeCalibFitParams(guessed_pixels, height=2000, width=2 * margin, margin=margin, outEdge=10.0,
+                                            inEdge=10.0)
+                fitPar.setAutomatic(False)
+                print(("halved guess ", len(guessed_pixels), guessed_pixels))
+                print(("halved known ", len(known_edges), known_edges))
+
+            module = int(tube_id / 24) + 1
+            tube_num = tube_id - (module - 1) * 24
+            print(("module ", module, "   tube ", tube_num))
+
+            if caltable:
+                # does this after the first time, it appends to a table
+                caltable, peakTable, meanCTable = tube_RKH.calibrate(
+                    result,
+                    tube_name,
+                    np.array(known_edges),
+                    funcForm,
+                    # outputPeak=peakTable falls over at addrow if number of peaks changes, so can only save one row at a time
+                    outputPeak=True,
+                    outputC=True,
+                    rangeList=[0],
+                    plotTube=[0],
+                    margin=margin,
+                    fitPar=fitPar,
+                    calibTable=caltable)
+            else:
+                # do this the FIRST time, starts a new table
+                print("first time, generate calib table")
+                caltable, peakTable, meanCTable = tube_RKH.calibrate(
+                    result,
+                    tube_name,
+                    np.array(known_edges),
+                    funcForm,
+                    # outputPeak=True,
+                    rangeList=[0],
+                    plotTube=[0],
+                    outputPeak=True,
+                    outputC=True,
+                    margin=margin,
+                    fitPar=fitPar)
+            diag_output[tube_id].append(CloneWorkspace(InputWorkspace="FittedTube0",
+                                        OutputWorkspace="Fit" + str(tube_id) + "_" + str(module) + "_" + str(tube_num)))
+            diag_output[tube_id].append(CloneWorkspace(InputWorkspace="TubePlot0",
+                                        OutputWorkspace="Tube" + str(tube_id) + "_" + str(module) + "_" + str(tube_num)))
+            # 8/7/14 save the fitted positions to see how well the fit does, all in mm
+            x_values = []
+            x0_values = []
+            bb = list(mtd["PeakTable"].row(0).values())
+            del bb[0]  # Remove string that can't be sorted
+            bb.sort()
+            # bb still contains a name string at the end
+            # it's just for disgnostics
+            for i in range(len(guessed_pixels)):
+                x0_values.append(bb[i] * dx + x0)
+                x_values.append(known_edges[i] * 1000. - bb[i] * dx - x0)
+            cc = CreateWorkspace(DataX=x0_values, DataY=x_values)
+            diag_output[tube_id].append(RenameWorkspace(InputWorkspace="cc",
+                                        OutputWorkspace="Data" + str(tube_id) + "_" + str(module) + "_" + str(tube_num)))
+
+            bb = list(mtd["meanCTable"].row(0).values())
+            meanCvalue.append(bb[1])
+            tubeList.append(tube_id)
+
+        ApplyCalibration(result, caltable)
+        print(tubeList)
+        print(meanCvalue)
+        cvalues = CreateWorkspace(DataX=tubeList, DataY=meanCvalue)
+
+        print(outputfilename)
+        SaveNexusProcessed(result, outputfilename)
+        # you will next need to run merge_calib_files.py to merge the tables for front and rear detectors
+
+        # expts
+        aa = mtd["PeakTable"].row(0)
+        print(aa)
+        print((aa.get('Peak10')))
+        bb = list(aa.values())
+
+        bb = list(mtd["PeakTable"].row(0).values())
+        del bb[0]  # Remove string that can't be sorted
+        print(bb)
+        bb.sort()
+        print(bb)
+
+        # now interrogate CalibTable to see how much we have shifted pixels by for each tube
+        # 18/3/15 this new version will work when we have skipped tubes as it reads the Detector ID's  from the table itself
+        # All this creates ws to check results, doesn't affect the main code
+        nentries = int(len(mtd["CalibTable"]) / 512)
+        print(("nentries in CalibTable = ", nentries))
+        i1 = 0
+        i2 = 512
+        dx = (522.2 + 519.2) / 511
+        for i in range(0, nentries):
+            tube_num = mtd["CalibTable"].column("Detector ID")[i1]
+            tube_num /= 1000
+            det = int(tube_num / 1000)
+            tube_num -= det * 1000
+            module = int(tube_num / 100)
+            tube_num = tube_num - module * 100
+            tube_id = (module - 1) * 24 + tube_num
+            print((tube_id, module, tube_num))
+            x_values = []
+            x0_values = []
+            # use left tube value here for now, right tube starts at -522.2    WHY THIS HERE ????
+            if TubeSide.getTubeSide(tube_id) == TubeSide.LEFT:
+                x0 = -519.2
+            else:
+                x0 = -522.2
+            for pos in mtd["CalibTable"].column("Detector Position")[i1:i2]:
+                x_values.append(pos.getX() * 1000.0 - x0)
+                x0_values.append(x0)
+                x0 += dx
+            plotN = CreateWorkspace(DataX=x0_values, DataY=x_values)
+            diag_output[i].append(RenameWorkspace(InputWorkspace="plotN",
+                                OutputWorkspace="Shift" + str(tube_id) + "_" + str(module) + "_" + str(tube_num)))
+            i1 = i1 + 512
+            i2 = i2 + 512
+
+        for tube_id, workspaces in diag_output.items():
+            GroupWorkspaces(InputWorkspaces=workspaces, OutputWorkspace=f"Tube_{tube_id:03}")
+
+        for x in (i for j in (list(range(0, 2)), list(range(10, 12)), list(range(23, 29))) for i in j):
+            print(x)
+            # Notice to self, the result will look wiggly in 3D but looks good in cylindrical Y
 
 # Register algorithm with Mantid
 AlgorithmFactory.subscribe(Calibrate)
