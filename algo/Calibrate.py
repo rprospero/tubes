@@ -1,12 +1,25 @@
 from mantid.kernel import *
 from mantid.api import *
-from mantid.simpleapi import Load, Rebin, SaveNexusProcessed, RenameWorkspace, CropWorkspace, Scale
+from mantid.simpleapi import Load, Rebin, SaveNexusProcessed, RenameWorkspace, CropWorkspace, Scale, CloneWorkspace, Multiply
 
 import itertools
 import numpy as np
 import os.path
 import copy
 import sys
+
+from tube_spec import TubeSpec
+
+class TubeSide:
+    LEFT = "left"
+    RIGHT = "right"
+
+    @classmethod
+    def getTubeSide(cls, tube_id):
+        if tube_id % 2 == 0:
+            return TubeSide.LEFT
+        else:
+            return TubeSide.RIGHT
 
 INF = sys.float_info.max # Convenient approximation for infinity
 
@@ -36,6 +49,57 @@ class Calibrate(PythonAlgorithm):
             raise RuntimeError("Cannot part strip run '{}'.  Expecting a string in the format of '920=SANS2D00064390.nxs', where 920 is the strip position and SANS2D00064390.nxs is the file name")
         return (int(parts[0]), parts[1])
 
+    @staticmethod
+    def multiply_ws_list(ws_list, output_ws_name):
+        print("Multiplying workspaces together...")
+        it = iter(ws_list)
+        total = str(next(it)) + '_scaled'
+        for element in it:
+            ws = str(element) + '_scaled'
+            total = Multiply(RHSWorkspace=total, LHSWorkspace=ws, OutputWorkspace=output_ws_name)
+        return total
+
+    @staticmethod
+    def get_tube_name(tube_id, detector_name):
+        # Construct the name of the tube based on the id (0-119) given.
+        side = TubeSide.getTubeSide(tube_id)
+        tube_side_num = tube_id // 2  # Need int name, not float appended
+        return detector_name + "-detector/" + side + str(tube_side_num)
+
+
+    def get_tube_data(self, tube_id, ws, detector_name):
+        tube_name = self.get_tube_name(tube_id, detector_name)
+
+        # Piggy-back the TubeSpec class from Karl's Calibration code so that dealing with tubes is easier than interrogating the IDF ourselves.
+        tube_spec = TubeSpec(ws)
+        tube_spec.setTubeSpecByString(tube_name)
+        assert tube_spec.getNumTubes() == 1
+        tube_ws_index_list = tube_spec.getTube(0)[0]
+        assert len(tube_ws_index_list) == 512
+
+        # Return an array of all counts for the tube.
+        return np.array([ws.dataY(ws_index)[0] for ws_index in tube_ws_index_list])
+
+    def get_tube_edge_pixels(self, detector_name, tube_id, ws, cutoff, first_pixel=0, last_pixel=sys.maxsize):
+        count_data = self.get_tube_data(tube_id, ws, detector_name)
+
+        if count_data[first_pixel] < cutoff:
+            up_edge = True
+        else:
+            up_edge = False
+
+        for i, count in enumerate(count_data[first_pixel:last_pixel + 1]):
+            pixel = first_pixel + i
+            if pixel > last_pixel:
+                break
+            if up_edge:
+                if count >= cutoff:
+                    up_edge = False
+                    yield pixel
+            else:
+                if count < cutoff:
+                    up_edge = True
+                    yield pixel
 
     @staticmethod
     def set_counts_to_one_between_x_range(ws, x_1, x_2):
@@ -144,10 +208,10 @@ class Calibrate(PythonAlgorithm):
         # Run the algorithm
         self.BACKGROUND = self.getProperty("Background").value
         self.timebin = self.getProperty("Time Bins").value
-        self.OFF_VERTICAL = self.getProperty("Vertical Offset").value
-        self.THRESHOLD = self.getProperty("Threshold").value
-        self.STARTPIXEL = self.getProperty("Starting Pixel").value
-        self.ENDPIXEL = self.getProperty("Ending Pixel").value
+        OFF_VERTICAL = self.getProperty("Vertical Offset").value
+        THRESHOLD = self.getProperty("Threshold").value
+        STARTPIXEL = self.getProperty("Starting Pixel").value
+        ENDPIXEL = self.getProperty("Ending Pixel").value
         self.FITEDGES = self.getProperty("Fit Edges").value
         self.rear = self.getProperty("Rear Detector").value
 
@@ -155,9 +219,11 @@ class Calibrate(PythonAlgorithm):
         if self.rear:
             index1 = 0
             index2 = 120 * 512 - 1
+            detector_name = "rear"
         else:
             index1 = 120*512
             index2 = 2*120*512 -1
+            detector_name = "front"
 
         data_files = [self._parse_strip(x) for x in self.getProperty("Strip positions").value]
 
@@ -191,6 +257,55 @@ class Calibrate(PythonAlgorithm):
             # set to 1 so that we can multiply all the shadows together, instead of running merged workspace 5 times.
             ws2 = str(ws) + '_scaled'
             self.set_counts_to_one_outside_x_range(mtd[ws2], boundary_start, boundary_end)
+
+        result_ws_name = "result"
+
+        self.multiply_ws_list(ws_list, result_ws_name)
+
+        result = mtd[result_ws_name]
+
+        original = CloneWorkspace(InputWorkspace=result_ws_name, OutputWorkspace="original")
+
+        known_edges_left = list(itertools.chain.from_iterable(known_left_edges))
+        failed_pixel_guesses = []
+        pixel_guesses = []
+        meanCvalue = []
+        tubeList = []
+
+        dx = (522.2 + 519.2) / 511
+        # default size of a pixel in real space in mm
+        # setting caltable to None  will start all over again, comment this line out to add further tubes to existing table
+        caltable = None
+        # caltable = True
+        diag_output = dict()
+
+        for tube_id in range(120):
+            # for tube_id in range(116,120):
+            diag_output[tube_id] = []
+
+            tube_name = self.get_tube_name(tube_id, detector_name)
+            print("\n==================================================")
+            print(("ID = %i, Name = \"%s\"" % (tube_id, tube_name)))
+            known_edges1 = copy.copy(known_edges_left)
+            if TubeSide.getTubeSide(tube_id) == TubeSide.LEFT:
+                # first pixel in mm, as per idf file for rear detector
+                x0 = -519.2
+            else:
+                x0 = -522.2
+
+            np.array(known_edges1)
+
+            known_edges = []
+            for index in range(len(known_edges1)):
+                known_edges.append(known_edges1[index] + (tube_id - 119.0) * OFF_VERTICAL / 119.0)
+
+            guessed_pixels = list(self.get_tube_edge_pixels(detector_name, tube_id, result, THRESHOLD, STARTPIXEL, ENDPIXEL))
+
+            # Store the guesses for printing out later, along with the tube id and name.
+            # pixel_guesses.append([tube_name, guessed_pixels])
+
+            print(), print((len(guessed_pixels), guessed_pixels))
+            print(), print((len(known_edges), known_edges))
 
 # Register algorithm with Mantid
 AlgorithmFactory.subscribe(Calibrate)
