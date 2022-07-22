@@ -184,7 +184,7 @@ class Calibrate(PythonAlgorithm):
 
     def PyInit(self):
         # Declare properties
-        self.declareProperty('Strip Positions',
+        self.declareProperty('StripPositions',
                              ["920=SANS2D00064390.nxs",
                               "755=SANS2D00064391.nxs",
                               "590=SANS2D00064392.nxs",
@@ -192,36 +192,36 @@ class Calibrate(PythonAlgorithm):
                               "260=SANS2D00064388.nxs"],
                              direction=Direction.Input,
                              doc="Which strip positions were used for which runs")
-        self.declareProperty('Rear Detector', True, direction=Direction.Input,
+        self.declareProperty('RearDetector', True, direction=Direction.Input,
                              doc="Whether to use the front or rear detector.")
         self.declareProperty('Threshold', 600, direction=Direction.Input,
                              doc="Threshold is the number of counts past which we class something as an edge.  This is quite sensitive to change, since we sometimes end up picking.")
         self.declareProperty('Margin', 25, direction=Direction.Input,
                              doc="FIXME: Detector margin")
-        self.declareProperty('Starting Pixel', 20, direction=Direction.Input,
+        self.declareProperty('StartingPixel', 20, direction=Direction.Input,
                              doc="Lower bound of detector's active region")
-        self.declareProperty('Ending Pixel', 495, direction=Direction.Input,
+        self.declareProperty('EndingPixel', 495, direction=Direction.Input,
                              doc="Upper bound of detector's active region")
-        self.declareProperty('Fit Edges', False, direction=Direction.Input,
+        self.declareProperty('FitEdges', False, direction=Direction.Input,
                              doc="FIXME: Fit the full edge of a shadow, instead of just the top and bottom.")
-        self.declareProperty('Time bins', '5000,93000,98000', direction=Direction.Input,
+        self.declareProperty('Timebins', '5000,93000,98000', direction=Direction.Input,
                              doc="Time of flight bins to use")
         self.declareProperty('Background', 10, direction=Direction.Input,
                              doc="Baseline detector background")
-        self.declareProperty('Vertical Offset', -0.005, direction=Direction.Input,
+        self.declareProperty('VerticalOffset', -0.005, direction=Direction.Input,
                              doc="Estimate of how many metres off-vertical the Cd strip is at bottom of the detector. Negative if strips are more to left at bottom than top of cylindrical Y plot.")
 
     def PyExec(self):
         # Run the algorithm
         self.BACKGROUND = self.getProperty("Background").value
-        self.timebin = self.getProperty("Time Bins").value
+        self.timebin = self.getProperty("TimeBins").value
         margin = self.getProperty("Margin").value
-        OFF_VERTICAL = self.getProperty("Vertical Offset").value
+        OFF_VERTICAL = self.getProperty("VerticalOffset").value
         THRESHOLD = self.getProperty("Threshold").value
-        STARTPIXEL = self.getProperty("Starting Pixel").value
-        ENDPIXEL = self.getProperty("Ending Pixel").value
-        FITEDGES = self.getProperty("Fit Edges").value
-        self.rear = self.getProperty("Rear Detector").value
+        STARTPIXEL = self.getProperty("StartingPixel").value
+        ENDPIXEL = self.getProperty("EndingPixel").value
+        FITEDGES = self.getProperty("FitEdges").value
+        self.rear = self.getProperty("RearDetector").value
 
 
         if self.rear:
@@ -233,7 +233,7 @@ class Calibrate(PythonAlgorithm):
             index2 = 2*120*512 -1
             detector_name = "front"
 
-        data_files = [self._parse_strip(x) for x in self.getProperty("Strip positions").value]
+        data_files = [self._parse_strip(x) for x in self.getProperty("StripPositions").value]
 
         known_edge_pairs = np.array([self._strip_edges[x[0]] for x in data_files])
         data_files = [x[1] for x in data_files]
