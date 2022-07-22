@@ -1,12 +1,13 @@
+import copy
+import itertools
+import os.path
+import sys
+
+import numpy as np
+
 from mantid.kernel import *
 from mantid.api import *
 from mantid.simpleapi import *
-import itertools
-import numpy as np
-import os.path
-import copy
-import sys
-
 from tube_spec import TubeSpec
 from ideal_tube import IdealTube
 from tube_calib_fit_params import TubeCalibFitParams
