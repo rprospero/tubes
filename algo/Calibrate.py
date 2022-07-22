@@ -43,8 +43,9 @@ class Calibrate(PythonAlgorithm):
         590: [-0.1089785, -0.070800335],
         425: [0.056795111, 0.094973275],
         260: [0.22350643, 0.261684595],
-        95:  [0.388342331, 0.426520496],
-        5:   [0.4787643, 0.516942465]}
+        95: [0.388342331, 0.426520496],
+        5: [0.4787643, 0.516942465]
+    }
 
     @staticmethod
     def multiply_ws_list(ws_list, output_ws_name):
@@ -53,7 +54,9 @@ class Calibrate(PythonAlgorithm):
         total = str(next(it)) + '_scaled'
         for element in it:
             ws = str(element) + '_scaled'
-            total = Multiply(RHSWorkspace=total, LHSWorkspace=ws, OutputWorkspace=output_ws_name)
+            total = Multiply(RHSWorkspace=total,
+                             LHSWorkspace=ws,
+                             OutputWorkspace=output_ws_name)
         return total
 
     @staticmethod
@@ -76,9 +79,16 @@ class Calibrate(PythonAlgorithm):
         assert len(tube_ws_index_list) == 512
 
         # Return an array of all counts for the tube.
-        return np.array([ws.dataY(ws_index)[0] for ws_index in tube_ws_index_list])
+        return np.array(
+            [ws.dataY(ws_index)[0] for ws_index in tube_ws_index_list])
 
-    def get_tube_edge_pixels(self, detector_name, tube_id, ws, cutoff, first_pixel=0, last_pixel=sys.maxsize):
+    def get_tube_edge_pixels(self,
+                             detector_name,
+                             tube_id,
+                             ws,
+                             cutoff,
+                             first_pixel=0,
+                             last_pixel=sys.maxsize):
         count_data = self.get_tube_data(tube_id, ws, detector_name)
 
         if count_data[first_pixel] < cutoff:
@@ -102,7 +112,8 @@ class Calibrate(PythonAlgorithm):
     @staticmethod
     def set_counts_to_one_between_x_range(ws, x_1, x_2):
         """"""
-        if x_1 > x_2: x_1, x_2 = x_2, x_1
+        if x_1 > x_2:
+            x_1, x_2 = x_2, x_1
         for wsIndex in range(ws.getNumberHistograms()):
             try:
                 if x_1 < ws.getDetector(wsIndex).getPos().getX() < x_2:
@@ -113,7 +124,8 @@ class Calibrate(PythonAlgorithm):
 
     def set_counts_to_one_outside_x_range(self, ws, x_1, x_2):
         """"""
-        if x_1 > x_2: x_1, x_2 = x_2, x_1
+        if x_1 > x_2:
+            x_1, x_2 = x_2, x_1
         self.set_counts_to_one_between_x_range(ws, -INF, x_1)
         self.set_counts_to_one_between_x_range(ws, x_2, INF)
 
@@ -124,21 +136,24 @@ class Calibrate(PythonAlgorithm):
         self.log().debug("look for:  {}".format(ws_name))
         try:
             ws = mtd[ws_name]
-            self.log().information("Using existing {} workspace".format(ws_name))
+            self.log().information(
+                "Using existing {} workspace".format(ws_name))
             prog.report("Loading {}".format(ws_name))
             return ws
         except:
             pass
         try:
             ws = Load(Filename="saved_" + data_file, OutputWorkspace=ws_name)
-            self.log().information("Loaded saved file from {}.".format("saved_" + data_file))
+            self.log().information(
+                "Loaded saved file from {}.".format("saved_" + data_file))
             prog.report("Loading {}".format(ws_name))
             return ws
         except:
             pass
 
         ws = Load(Filename=data_file, OutputWorkspace=ws_name)
-        self.log().information("Loaded and integrating data from {}.".format(data_file))
+        self.log().information(
+            "Loaded and integrating data from {}.".format(data_file))
         # turn event mode into histogram with a single bin
         ws = Rebin(ws, self.timebin, PreserveEvents=False)
         # else for histogram data use integration or sumpsectra
@@ -148,7 +163,6 @@ class Calibrate(PythonAlgorithm):
 
         prog.report("Loading {}".format(ws_name))
         return ws
-
 
     @staticmethod
     def get_merged_edge_pairs_and_boundaries(edge_pairs):
@@ -184,32 +198,60 @@ class Calibrate(PythonAlgorithm):
                              [1040, 920, 755, 590, 425, 260, 95, 5],
                              direction=Direction.Input,
                              doc="Which strip positions were used")
-        self.declareProperty('DataFiles',
-                             ["SANS2D00064390.nxs",
-                              "SANS2D00064391.nxs",
-                              "SANS2D00064392.nxs",
-                              "SANS2D00064393.nxs",
-                              "SANS2D00064388.nxs"],
+        self.declareProperty(
+            'DataFiles', [
+                "SANS2D00064390.nxs", "SANS2D00064391.nxs",
+                "SANS2D00064392.nxs", "SANS2D00064393.nxs",
+                "SANS2D00064388.nxs"
+            ],
+            direction=Direction.Input,
+            doc="Which strip positions were used for which runs")
+        self.declareProperty('RearDetector',
+                             True,
                              direction=Direction.Input,
-                             doc="Which strip positions were used for which runs")
-        self.declareProperty('RearDetector', True, direction=Direction.Input,
                              doc="Whether to use the front or rear detector.")
-        self.declareProperty('Threshold', 600, direction=Direction.Input,
-                             doc="Threshold is the number of counts past which we class something as an edge.  This is quite sensitive to change, since we sometimes end up picking.")
-        self.declareProperty('Margin', 25, direction=Direction.Input,
+        self.declareProperty(
+            'Threshold',
+            600,
+            direction=Direction.Input,
+            doc= "Threshold is the number of counts past which we class something as an edge.  "
+            "This is quite sensitive to change, since we sometimes end up picking."
+        )
+        self.declareProperty('Margin',
+                             25,
+                             direction=Direction.Input,
                              doc="FIXME: Detector margin")
-        self.declareProperty('StartingPixel', 20, direction=Direction.Input,
+        self.declareProperty('StartingPixel',
+                             20,
+                             direction=Direction.Input,
                              doc="Lower bound of detector's active region")
-        self.declareProperty('EndingPixel', 495, direction=Direction.Input,
+        self.declareProperty('EndingPixel',
+                             495,
+                             direction=Direction.Input,
                              doc="Upper bound of detector's active region")
-        self.declareProperty('FitEdges', False, direction=Direction.Input,
-                             doc="FIXME: Fit the full edge of a shadow, instead of just the top and bottom.")
-        self.declareProperty('Timebins', '5000,93000,98000', direction=Direction.Input,
+        self.declareProperty(
+            'FitEdges',
+            False,
+            direction=Direction.Input,
+            doc=
+            "FIXME: Fit the full edge of a shadow, instead of just the top and bottom."
+        )
+        self.declareProperty('Timebins',
+                             '5000,93000,98000',
+                             direction=Direction.Input,
                              doc="Time of flight bins to use")
-        self.declareProperty('Background', 10, direction=Direction.Input,
+        self.declareProperty('Background',
+                             10,
+                             direction=Direction.Input,
                              doc="Baseline detector background")
-        self.declareProperty('VerticalOffset', -0.005, direction=Direction.Input,
-                             doc="Estimate of how many metres off-vertical the Cd strip is at bottom of the detector. Negative if strips are more to left at bottom than top of cylindrical Y plot.")
+        self.declareProperty(
+            'VerticalOffset',
+            -0.005,
+            direction=Direction.Input,
+            doc=
+            "Estimate of how many metres off-vertical the Cd strip is at bottom of the detector. "
+            "Negative if strips are more to left at bottom than top of cylindrical Y plot."
+        )
 
     def validateInputs(self):
         issues = dict()
@@ -217,11 +259,15 @@ class Calibrate(PythonAlgorithm):
         positions = len(self.getProperty("StripPositions").value)
 
         if positions > files:
-            issues["DataFiles"] = "There must be a measurement for each strip position."
+            issues[
+                "DataFiles"] = "There must be a measurement for each strip position."
         if files > positions:
-            issues["StripPositions"] = "There must be a strip position for each measurement."
-        if self.getProperty("EndingPixel").value <= self.getProperty("StartingPixel").value:
-            issues["EndingPixel"] = "The ending pixel must have a greater index than the starting pixel."
+            issues[
+                "StripPositions"] = "There must be a strip position for each measurement."
+        if self.getProperty("EndingPixel").value <= self.getProperty(
+                "StartingPixel").value:
+            issues[
+                "EndingPixel"] = "The ending pixel must have a greater index than the starting pixel."
 
         return issues
 
@@ -237,46 +283,63 @@ class Calibrate(PythonAlgorithm):
         FITEDGES = self.getProperty("FitEdges").value
         self.rear = self.getProperty("RearDetector").value
         data_files = self.getProperty("DataFiles").value
-        known_edge_pairs = np.array([self._strip_edges[pos] for pos in self.getProperty("StripPositions").value])
-
+        known_edge_pairs = np.array([
+            self._strip_edges[pos]
+            for pos in self.getProperty("StripPositions").value
+        ])
 
         if self.rear:
             index1 = 0
             index2 = 120 * 512 - 1
             detector_name = "rear"
         else:
-            index1 = 120*512
-            index2 = 2*120*512 -1
+            index1 = 120 * 512
+            index2 = 2 * 120 * 512 - 1
             detector_name = "front"
 
-        load_report = Progress(self, start=0, end=0.4, nreports=len(data_files))
-        ws_list = [self.get_integrated_workspace(data_file, load_report) for data_file in data_files]
+        load_report = Progress(self,
+                               start=0,
+                               end=0.4,
+                               nreports=len(data_files))
+        ws_list = [
+            self.get_integrated_workspace(data_file, load_report)
+            for data_file in data_files
+        ]
 
         # Scale workspaces
         i = 0
+
         def charge(ws):
             return mtd[ws].getRun()["proton_charge_by_period"].value
 
         uamphr_to_rescale = charge(data_files[0].split('.')[0])
         for ws in data_files:
             ws2 = ws.split('.')[0]
-            CropWorkspace(InputWorkspace=ws2, OutputWorkspace=ws2 + '_scaled', StartWorkspaceIndex=index1,
-                        EndWorkspaceIndex=index2)
-            Scale(uamphr_to_rescale / charge(ws2), "Multiply", InputWorkspace=ws2 + '_scaled', OutputWorkspace=ws2 + '_scaled')
+            CropWorkspace(InputWorkspace=ws2,
+                          OutputWorkspace=ws2 + '_scaled',
+                          StartWorkspaceIndex=index1,
+                          EndWorkspaceIndex=index2)
+            Scale(uamphr_to_rescale / charge(ws2),
+                  "Multiply",
+                  InputWorkspace=ws2 + '_scaled',
+                  OutputWorkspace=ws2 + '_scaled')
             i += 1
-
 
         known_left_edge_pairs = copy.copy(known_edge_pairs)
 
-        _, boundaries = self.get_merged_edge_pairs_and_boundaries(known_edge_pairs)
-        known_left_edges, _ = self.get_merged_edge_pairs_and_boundaries(known_left_edge_pairs)
+        _, boundaries = self.get_merged_edge_pairs_and_boundaries(
+            known_edge_pairs)
+        known_left_edges, _ = self.get_merged_edge_pairs_and_boundaries(
+            known_left_edge_pairs)
 
-
-        for ws, (boundary_start, boundary_end) in zip(ws_list, pairwise(boundaries)):
-            print(("Isolating shadow in %s between boundaries %g and %g." % (str(ws), boundary_start, boundary_end)))
+        for ws, (boundary_start, boundary_end) in zip(ws_list,
+                                                      pairwise(boundaries)):
+            print(("Isolating shadow in %s between boundaries %g and %g." %
+                   (str(ws), boundary_start, boundary_end)))
             # set to 1 so that we can multiply all the shadows together, instead of running merged workspace 5 times.
             ws2 = str(ws) + '_scaled'
-            self.set_counts_to_one_outside_x_range(mtd[ws2], boundary_start, boundary_end)
+            self.set_counts_to_one_outside_x_range(mtd[ws2], boundary_start,
+                                                   boundary_end)
 
         result_ws_name = "result"
 
@@ -284,9 +347,11 @@ class Calibrate(PythonAlgorithm):
 
         result = mtd[result_ws_name]
 
-        original = CloneWorkspace(InputWorkspace=result_ws_name, OutputWorkspace="original")
+        original = CloneWorkspace(InputWorkspace=result_ws_name,
+                                  OutputWorkspace="original")
 
-        known_edges_left = list(itertools.chain.from_iterable(known_left_edges))
+        known_edges_left = list(
+            itertools.chain.from_iterable(known_left_edges))
         failed_pixel_guesses = []
         pixel_guesses = []
         meanCvalue = []
@@ -319,9 +384,12 @@ class Calibrate(PythonAlgorithm):
 
             known_edges = []
             for index in range(len(known_edges1)):
-                known_edges.append(known_edges1[index] + (tube_id - 119.0) * OFF_VERTICAL / 119.0)
+                known_edges.append(known_edges1[index]
+                                   + (tube_id - 119.0) * OFF_VERTICAL / 119.0)
 
-            guessed_pixels = list(self.get_tube_edge_pixels(detector_name, tube_id, result, THRESHOLD, STARTPIXEL, ENDPIXEL))
+            guessed_pixels = list(
+                self.get_tube_edge_pixels(detector_name, tube_id, result,
+                                          THRESHOLD, STARTPIXEL, ENDPIXEL))
 
             # Store the guesses for printing out later, along with the tube id and name.
             # pixel_guesses.append([tube_name, guessed_pixels])
@@ -329,21 +397,30 @@ class Calibrate(PythonAlgorithm):
             print(), print((len(guessed_pixels), guessed_pixels))
             print(), print((len(known_edges), known_edges))
 
-            # note funcForm==2 fits an edge using error function, (see SANS2DEndErfc above, and code in tube_calib_RKH.py,) while any other value fits a Gaussian
+            # note funcForm==2 fits an edge using error function, (see
+            # SANS2DEndErfc above, and code in tube_calib_RKH.py,)
+            # while any other value fits a Gaussian
             if FITEDGES:
                 funcForm = [2] * len(guessed_pixels)
-                fitPar = TubeCalibFitParams(guessed_pixels, outEdge=10.0, inEdge=10.0)
+                fitPar = TubeCalibFitParams(guessed_pixels,
+                                            outEdge=10.0,
+                                            inEdge=10.0)
             else:
                 # average pairs of edges for single peak fit, could in principle do only some tubes or parts of tubes this way!
                 guess = []
                 known = []
                 for i in range(0, len(guessed_pixels), 2):
-                    guess.append((guessed_pixels[i] + guessed_pixels[i + 1]) / 2)
+                    guess.append(
+                        (guessed_pixels[i] + guessed_pixels[i + 1]) / 2)
                     known.append((known_edges[i] + known_edges[i + 1]) / 2)
                 funcForm = [3] * len(guess)
                 guessed_pixels = guess
                 known_edges = known
-                fitPar = TubeCalibFitParams(guessed_pixels, height=2000, width=2 * margin, margin=margin, outEdge=10.0,
+                fitPar = TubeCalibFitParams(guessed_pixels,
+                                            height=2000,
+                                            width=2 * margin,
+                                            margin=margin,
+                                            outEdge=10.0,
                                             inEdge=10.0)
                 fitPar.setAutomatic(False)
                 print(("halved guess ", len(guessed_pixels), guessed_pixels))
@@ -383,10 +460,12 @@ class Calibrate(PythonAlgorithm):
                     outputC=True,
                     margin=margin,
                     fitPar=fitPar)
-            diag_output[tube_id].append(CloneWorkspace(InputWorkspace="FittedTube0",
-                                        OutputWorkspace="Fit" + str(tube_id) + "_" + str(module) + "_" + str(tube_num)))
-            diag_output[tube_id].append(CloneWorkspace(InputWorkspace="TubePlot0",
-                                        OutputWorkspace="Tube" + str(tube_id) + "_" + str(module) + "_" + str(tube_num)))
+            diag_output[tube_id].append(
+                CloneWorkspace(InputWorkspace="FittedTube0",
+                               OutputWorkspace="Fit{}_{}_{}".format(tube_id, module, tube_num)))
+            diag_output[tube_id].append(
+                CloneWorkspace(InputWorkspace="TubePlot0",
+                               OutputWorkspace="Tube{}_{}_{}".format(tube_id, module, tube_num)))
             # 8/7/14 save the fitted positions to see how well the fit does, all in mm
             x_values = []
             x0_values = []
@@ -399,8 +478,9 @@ class Calibrate(PythonAlgorithm):
                 x0_values.append(bb[i] * dx + x0)
                 x_values.append(known_edges[i] * 1000. - bb[i] * dx - x0)
             cc = CreateWorkspace(DataX=x0_values, DataY=x_values)
-            diag_output[tube_id].append(RenameWorkspace(InputWorkspace="cc",
-                                        OutputWorkspace="Data" + str(tube_id) + "_" + str(module) + "_" + str(tube_num)))
+            diag_output[tube_id].append(
+                RenameWorkspace(InputWorkspace=cc,
+                                OutputWorkspace="Data{}_{}_{}".format(tube_id, module, tube_num)))
 
             bb = list(mtd["meanCTable"].row(0).values())
             meanCvalue.append(bb[1])
@@ -459,23 +539,24 @@ class Calibrate(PythonAlgorithm):
                 x0_values.append(x0)
                 x0 += dx
             plotN = CreateWorkspace(DataX=x0_values, DataY=x_values)
-            diag_output[i].append(RenameWorkspace(InputWorkspace="plotN",
-                                OutputWorkspace="Shift" + str(tube_id) + "_" + str(module) + "_" + str(tube_num)))
+            diag_output[i].append(
+                RenameWorkspace(InputWorkspace="plotN",
+                                OutputWorkspace="Shift{}_{}_{}".format(tube_id, module, tube_num)))
             i1 = i1 + 512
             i2 = i2 + 512
             calib_report.report("Calibrating")
 
         for tube_id, workspaces in diag_output.items():
-            GroupWorkspaces(InputWorkspaces=workspaces, OutputWorkspace=f"Tube_{tube_id:03}")
+            GroupWorkspaces(InputWorkspaces=workspaces,
+                            OutputWorkspace=f"Tube_{tube_id:03}")
 
-        for x in (i for j in (list(range(0, 2)), list(range(10, 12)), list(range(23, 29))) for i in j):
+        for x in (i for j in (list(range(0, 2)), list(range(10, 12)),
+                              list(range(23, 29))) for i in j):
             print(x)
             # Notice to self, the result will look wiggly in 3D but looks good in cylindrical Y
 
     def calibrate(self, ws, tubeSet, knownPositions, funcForm, **kwargs):
-        """
-
-        Define the calibrated positions of the detectors inside the tubes defined
+        """Define the calibrated positions of the detectors inside the tubes defined
         in tubeSet.
 
         Tubes may be considered a list of detectors alined that may be considered
@@ -689,7 +770,9 @@ class Calibrate(PythonAlgorithm):
 
 
         :param ws: Integrated workspace with tubes to be calibrated.
-        :param tubeSet: Specification of Set of tubes to be calibrated. If a string is passed, a TubeSpec will be created passing the string as the setTubeSpecByString.
+        :param tubeSet: Specification of Set of tubes to be
+        calibrated. If a string is passed, a TubeSpec will be created
+        passing the string as the setTubeSpecByString.
 
         This will be the case for TubeSpec as string
 
@@ -708,35 +791,57 @@ class Calibrate(PythonAlgorithm):
         If a :class:`~tube_spec.TubeSpec` object is passed, it will be used as it is.
 
 
-        :param knownPositions: The defined position for the peaks/edges, taking the center as the origin and having the same units as the tube length in the 3D space.
+        :param knownPositions: The defined position for the
+        peaks/edges, taking the center as the origin and having the
+        same units as the tube length in the 3D space.
 
-        :param funcForm: list with special values to define the format of the peaks/edge (peaks=1, edge=2). If it is not provided, it will be assumed that all the knownPositions are peaks.
+        :param funcForm: list with special values to define the format
+        of the peaks/edge (peaks=1, edge=2). If it is not provided, it
+        will be assumed that all the knownPositions are peaks.
 
 
         Optionals parameters to tune the calibration:
 
-        :param fitPar: Define the parameters to be used in the fit as a :class:`~tube_calib_fit_params.TubeCalibFitParams`. If not provided, the dynamic mode is used. See :py:func:`~Examples.TubeCalibDemoMaps_All.provideTheExpectedValue`
+        :param fitPar: Define the parameters to be used in the fit as
+        a :class:`~tube_calib_fit_params.TubeCalibFitParams`. If not
+        provided, the dynamic mode is used. See
+        :py:func:`~Examples.TubeCalibDemoMaps_All.provideTheExpectedValue`
 
-        :param margin: value in pixesl that will be used around the peaks/edges to fit them. Default = 15. See the code of :py:mod:`~Examples.TubeCalibDemoMerlin` where **margin** is used to calibrate small tubes.
+        :param margin: value in pixesl that will be used around the
+        peaks/edges to fit them. Default = 15. See the code of
+        :py:mod:`~Examples.TubeCalibDemoMerlin` where **margin** is
+        used to calibrate small tubes.
 
         .. code-block:: python
 
             fit_start, fit_end = centre - margin, centre + margin
 
-        :param rangeList: list of tubes indexes that will be calibrated. As in the following code (see: :py:func:`~Examples.TubeCalibDemoMaps_All.improvingCalibrationSingleTube`):
+        :param rangeList: list of tubes indexes that will be
+        calibrated. As in the following code (see:
+        :py:func:`~Examples.TubeCalibDemoMaps_All.improvingCalibrationSingleTube`):
 
         .. code-block:: python
 
             for index in rangelist:
                 do_calibrate(tubeSet.getTube(index))
 
-        :param calibTable: Pass the calibration table, it will them append the values to the provided one and return it. (see: :py:mod:`~Examples.TubeCalibDemoMerlin`)
+        :param calibTable: Pass the calibration table, it will them
+        append the values to the provided one and return it. (see:
+        :py:mod:`~Examples.TubeCalibDemoMerlin`)
 
-        :param plotTube: If given, the tube whose index is in plotTube will be ploted as well as its fitted peaks, it can receive a list of indexes to plot.(see: :py:func:`~Examples.TubeCalibDemoMaps_All.changeMarginAndExpectedValue`)
+        :param plotTube: If given, the tube whose index is in plotTube
+        will be ploted as well as its fitted peaks, it can receive a
+        list of indexes to plot.(see:
+        :py:func:`~Examples.TubeCalibDemoMaps_All.changeMarginAndExpectedValue`)
 
-        :param excludeShortTubes: Do not calibrate tubes whose length is smaller than given value. (see at: Examples/TubeCalibDemoMerlin_Adjustable.py)
+        :param excludeShortTubes: Do not calibrate tubes whose length
+        is smaller than given value. (see at:
+        Examples/TubeCalibDemoMerlin_Adjustable.py)
 
-        :param overridePeaks: dictionary that defines an array of peaks positions (in pixels) to be used for the specific tube(key). (see: :py:func:`~Examples.TubeCalibDemoMaps_All.improvingCalibrationSingleTube`)
+        :param overridePeaks: dictionary that defines an array of
+        peaks positions (in pixels) to be used for the specific
+        tube(key). (see:
+        :py:func:`~Examples.TubeCalibDemoMaps_All.improvingCalibrationSingleTube`)
 
         .. code-block:: python
 
@@ -746,10 +851,19 @@ class Calibrate(PythonAlgorithm):
                 # skip finding peaks
                 fit_peaks_to_position()
 
-        :param fitPolyn: Define the order of the polinomial to fit the pixels positions agains the known positions. The acceptable values are 1, 2 or 3. Default = 2.
+        :param fitPolyn: Define the order of the polinomial to fit the
+        pixels positions agains the known positions. The acceptable
+        values are 1, 2 or 3. Default = 2.
 
 
-        :param outputPeak: Enable the calibrate to output the peak table, relating the tubes with the pixels positions. It may be passed as a boolean value (outputPeak=True) or as a peakTable value. The later case is to inform calibrate to append the new values to the given peakTable. This is usefull when you have to operate in subsets of tubes. (see :py:mod:`~Examples.TubeCalibDemoMerlin` that shows a nice inspection on this table).
+        :param outputPeak: Enable the calibrate to output the peak
+        table, relating the tubes with the pixels positions. It may be
+        passed as a boolean value (outputPeak=True) or as a peakTable
+        value. The later case is to inform calibrate to append the new
+        values to the given peakTable. This is usefull when you have
+        to operate in subsets of tubes. (see
+        :py:mod:`~Examples.TubeCalibDemoMerlin` that shows a nice
+        inspection on this table).
 
         .. code-block:: python
 
@@ -777,10 +891,12 @@ class Calibrate(PythonAlgorithm):
 
         # check that only valid arguments were passed through kwargs
         for key in list(kwargs.keys()):
-            if key not in [FITPAR, MARGIN, RANGELIST, CALIBTABLE, PLOTTUBE,
-                        EXCLUDESHORT, OVERRIDEPEAKS, FITPOLIN,
-                        OUTPUTPEAK, OUTPUTC]:
-                msg = "Wrong argument: '%s'! This argument is not defined in the signature of this function. Hint: remember that arguments are case sensitive" % key
+            if key not in [
+                    FITPAR, MARGIN, RANGELIST, CALIBTABLE, PLOTTUBE,
+                    EXCLUDESHORT, OVERRIDEPEAKS, FITPOLIN, OUTPUTPEAK, OUTPUTC
+            ]:
+                msg = ("Wrong argument: '%s'! This argument is not defined in the signature of this function. "
+                       "Hint: remember that arguments are case sensitive" % key)
                 raise RuntimeError(msg)
 
         # check parameter ws: if it was given as string, transform it in
@@ -788,7 +904,9 @@ class Calibrate(PythonAlgorithm):
         if isinstance(ws, str):
             ws = mtd[ws]
         if not isinstance(ws, MatrixWorkspace):
-            raise RuntimeError("Wrong argument ws = %s. It must be a MatrixWorkspace" % (str(ws)))
+            raise RuntimeError(
+                "Wrong argument ws = %s. It must be a MatrixWorkspace" %
+                (str(ws)))
 
         # check parameter tubeSet. It accepts string or preferable a TubeSpec
         if isinstance(tubeSet, str):
@@ -801,16 +919,20 @@ class Calibrate(PythonAlgorithm):
             tubeSet.setTubeSpecByStringArray(selectedTubes)
         elif not isinstance(tubeSet, TubeSpec):
             raise RuntimeError(
-                "Wrong argument tubeSet. It must be a TubeSpec or a string that defines the set of tubes to be calibrated. For example: WISH/panel03")
+                "Wrong argument tubeSet. "
+                "It must be a TubeSpec or a string that defines the set of tubes to be calibrated. For example: WISH/panel03"
+            )
 
         # check the known_positions parameter
         # for old version compatibility, it also accepts IdealTube, eventhough
         # they should only be used internally
-        if not (isinstance(knownPositions, list) or
-                isinstance(knownPositions, tuple) or
-                isinstance(knownPositions, np.ndarray)):
+        if not (isinstance(knownPositions, list)
+                or isinstance(knownPositions, tuple)
+                or isinstance(knownPositions, np.ndarray)):
             raise RuntimeError(
-                "Wrong argument knownPositions. It expects a list of values for the positions expected for the peaks in relation to the center of the tube")
+                "Wrong argument knownPositions. "
+                "It expects a list of values for the positions expected for the peaks in relation to the center of the tube"
+            )
         else:
             idealTube = IdealTube()
             idealTube.setArray(np.array(knownPositions))
@@ -826,8 +948,12 @@ class Calibrate(PythonAlgorithm):
                     raise 2
         except:
             raise RuntimeError(
-                "Wrong argument FuncForm. It expects a list of values describing the form of every single peaks. So, for example, if there are three peaks where the first is a peak and the followers as edge, funcForm = [1, 2, 2]. Currently, it is defined 1-Gaussian Peak, 2 - Edge. The knownPos has %d elements and the given funcForm has %d." % (
-                nPeaks, len(funcForm)))
+                ("Wrong argument FuncForm. "
+                 "It expects a list of values describing the form of every single peaks. "
+                 "So, for example, if there are three peaks where the first is a peak and the followers as edge, funcForm = [1, 2, 2]. "
+                 "Currently, it is defined 1-Gaussian Peak, 2 - Edge. "
+                 "The knownPos has %d elements and the given funcForm has %d."
+                % (nPeaks, len(funcForm))))
 
         # apply the functional form to the ideal Tube
         idealTube.setForm(funcForm)
@@ -842,7 +968,8 @@ class Calibrate(PythonAlgorithm):
             # fitPar must be a TubeCalibFitParams
             if not isinstance(fitPar, TubeCalibFitParams):
                 raise RuntimeError(
-                    "Wrong argument %s. This argument, when given, must be a valid TubeCalibFitParams object" % FITPAR)
+                    "Wrong argument %s. This argument, when given, must be a valid TubeCalibFitParams object"
+                    % FITPAR)
         else:
             # create a fit parameters guessing centre positions
             # the guessing obeys the following rule:
@@ -869,7 +996,8 @@ class Calibrate(PythonAlgorithm):
             try:
                 margin = float(kwargs[MARGIN])
             except:
-                raise RuntimeError("Wrong argument %s. It was expected a number!" % MARGIN)
+                raise RuntimeError(
+                    "Wrong argument %s. It was expected a number!" % MARGIN)
             fitPar.setMargin(margin)
 
         # deal with RANGELIST parameter
@@ -882,7 +1010,9 @@ class Calibrate(PythonAlgorithm):
                 # rangeList becomes a list
                 rangeList = list(rangeList)
             except:
-                raise RuntimeError("Wrong argument %s. It expects a list of indexes for calibration" % RANGELIST)
+                raise RuntimeError(
+                    "Wrong argument %s. It expects a list of indexes for calibration"
+                    % RANGELIST)
         else:
             rangeList = list(range(tubeSet.getNumTubes()))
 
@@ -900,13 +1030,16 @@ class Calibrate(PythonAlgorithm):
                 if calibTable.columnCount() != 2:
                     raise 2
                 colNames = calibTable.getColumnNames()
-                if colNames[0] != 'Detector ID' or colNames[1] != 'Detector Position':
+                if colNames[0] != 'Detector ID' or colNames[
+                        1] != 'Detector Position':
                     raise 3
             except:
                 raise RuntimeError(
-                    "Invalid type for %s. The expected type was ITableWorkspace with 2 columns(Detector ID and Detector Positions)" % CALIBTABLE)
+                    "Invalid type for %s. The expected type was ITableWorkspace with 2 columns(Detector ID and Detector Positions)"
+                    % CALIBTABLE)
         else:
-            calibTable = CreateEmptyTableWorkspace(OutputWorkspace="CalibTable")
+            calibTable = CreateEmptyTableWorkspace(
+                OutputWorkspace="CalibTable")
             # "Detector ID" column required by ApplyCalibration
             calibTable.addColumn(type="int", name="Detector ID")
             # "Detector Position" column required by ApplyCalibration
@@ -920,7 +1053,9 @@ class Calibrate(PythonAlgorithm):
             try:
                 plotTube = list(plotTube)
             except:
-                raise RuntimeError("Wrong argument %s. It expects an index (int) or a list of indexes" % PLOTTUBE)
+                raise RuntimeError(
+                    "Wrong argument %s. It expects an index (int) or a list of indexes"
+                    % PLOTTUBE)
         else:
             plotTube = []
 
@@ -931,7 +1066,8 @@ class Calibrate(PythonAlgorithm):
                 excludeShortTubes = float(excludeShortTubes)
             except:
                 raise RuntimeError(
-                    "Wrong argument %s. It expects a float value for the minimun size of tubes to be calibrated")
+                    "Wrong argument %s. It expects a float value for the minimun size of tubes to be calibrated"
+                )
         else:
             # a tube with length 0 can not be calibrated, this is the minimun value
             excludeShortTubes = 0.0
@@ -953,7 +1089,10 @@ class Calibrate(PythonAlgorithm):
                         raise 4
             except:
                 raise RuntimeError(
-                    "Wrong argument %s. It expects a dictionary with key as the tube index and the value as a list of peaks positions. Ex (3 peaks): overridePeaks = {1:[2,5.4,500]}" % OVERRIDEPEAKS)
+                    "Wrong argument %s. "
+                    "It expects a dictionary with key as the tube index and the value as a list of peaks positions. "
+                    "Ex (3 peaks): overridePeaks = {1:[2,5.4,500]}"
+                    % OVERRIDEPEAKS)
         else:
             overridePeaks = dict()
 
@@ -962,7 +1101,9 @@ class Calibrate(PythonAlgorithm):
             polinFit = kwargs[FITPOLIN]
             if polinFit not in [1, 2, 3]:
                 raise RuntimeError(
-                    "Wrong argument %s. It expects a number 1 for linear, 2 for quadratic, or 3 for 3rd polinomial order when fitting the pixels positions agains the known positions" % FITPOLIN)
+                    "Wrong argument %s. It expects a number 1 for linear, "
+                    "2 for quadratic, or 3 for 3rd polinomial order when fitting the pixels positions agains the known positions"
+                    % FITPOLIN)
         else:
             polinFit = 2
 
@@ -975,7 +1116,9 @@ class Calibrate(PythonAlgorithm):
         if isinstance(outputPeak, ITableWorkspace):
             if outputPeak.columnCount() < len(idealTube.getArray()):
                 raise RuntimeError(
-                    "Wrong argument %s. It expects a boolean flag, or a ITableWorksapce with columns (TubeId, Peak1,...,PeakM) for M = number of peaks given in knownPositions" % OUTPUTPEAK)
+                    "Wrong argument %s. It expects a boolean flag, or a ITableWorksapce with columns (TubeId, Peak1,...,PeakM) "
+                    "for M = number of peaks given in knownPositions"
+                    % OUTPUTPEAK)
         else:
             if not outputPeak:
                 deletePeakTableAfter = True
@@ -996,8 +1139,10 @@ class Calibrate(PythonAlgorithm):
         outputC.addColumn(type='float', name='meanC')
 
         # RKH added meanCTable
-        self.getCalibration_RKH(ws, tubeSet, calibTable, fitPar, idealTube, outputPeak, outputC,
-                        overridePeaks, excludeShortTubes, plotTube, rangeList, polinFit)
+        self.getCalibration_RKH(ws, tubeSet, calibTable, fitPar, idealTube,
+                                outputPeak, outputC, overridePeaks,
+                                excludeShortTubes, plotTube, rangeList,
+                                polinFit)
 
         if deletePeakTableAfter:
             DeleteWorkspace(str(outputPeak))
@@ -1006,10 +1151,8 @@ class Calibrate(PythonAlgorithm):
             # RKH added meanCTable
             return calibTable, outputPeak, outputC
 
-
     def savePeak(peakTable, filePath):
-        """
-        Allows to save the peakTable to a text file.
+        """Allows to save the peakTable to a text file.
 
         :param peakTable: peak table as the workspace table provided by calibrated method, as in the example:
 
@@ -1018,7 +1161,9 @@ class Calibrate(PythonAlgorithm):
         calibTable, peakTable = calibrate(..., outputPeak=peakTable)
         savePeak(peakTable, 'myfolder/myfile.txt')
 
-        :param filePath: where to save the file. If the filePath is not given as an absolute path, it will be considered relative to the defaultsave.directory.
+        :param filePath: where to save the file. If the filePath is
+        not given as an absolute path, it will be considered relative
+        to the defaultsave.directory.
 
         The file will be saved with the following format:
 
@@ -1050,7 +1195,6 @@ class Calibrate(PythonAlgorithm):
             print(tube_name, peak_values, file=pFile)
 
         pFile.close()
-
 
     def readPeakFile(file_name):
         """Load the file calibration
@@ -1097,20 +1241,43 @@ class Calibrate(PythonAlgorithm):
             loaded_file.append((id_, f_values))
         return loaded_file
 
-    def getCalibration_RKH(self, ws, tubeSet, calibTable, fitPar, iTube, peaksTable, meanCTable,
-                        overridePeaks=dict(), excludeShortTubes=0.0, plotTube=[],
-                        rangeList=None, polinFit=2, peaksTestMode=False):
-        """
-        Get the results the calibration and put them in the calibration table provided.
+    def getCalibration_RKH(self,
+                           ws,
+                           tubeSet,
+                           calibTable,
+                           fitPar,
+                           iTube,
+                           peaksTable,
+                           meanCTable,
+                           overridePeaks=dict(),
+                           excludeShortTubes=0.0,
+                           plotTube=[],
+                           rangeList=None,
+                           polinFit=2,
+                           peaksTestMode=False):
+        """Get the results the calibration and put them in the calibration table provided.
         RKH added meanCTable to pass back mean of "resolution"
         :param ws: Integrated Workspace with tubes to be calibrated
         :param tubeSet: Specification of Set of tubes to be calibrated ( :class:`~tube_spec.TubeSpec` object)
-        :param calibTable: Empty calibration table into which the calibration results are placed. It is composed by 'Detector ID' and a V3D column 'Detector Position'. It will be filled with the IDs and calibrated positions of the detectors.
+
+        :param calibTable: Empty calibration table into which the
+        calibration results are placed. It is composed by 'Detector
+        ID' and a V3D column 'Detector Position'. It will be filled
+        with the IDs and calibrated positions of the detectors.
+
         :param fitPar: A :class:`~tube_calib_fit_params.TubeCalibFitParams` object for fitting the peaks
-        :param iTube: The :class:`~ideal_tube.IdealTube` which contains the positions in metres of the shadows of the slits, bars or edges used for calibration.
+
+        :param iTube: The :class:`~ideal_tube.IdealTube` which
+        contains the positions in metres of the shadows of the slits,
+        bars or edges used for calibration.
+
         :param peaksTable: Peaks table into wich the peaks positions will be put
         :param meanCTable: RKH added, mean value of "resolution" parameter
-        :param overridePeak: dictionary with tube indexes keys and an array of peaks in pixels to override those that would be fitted for one tube
+
+        :param overridePeak: dictionary with tube indexes keys and an
+        array of peaks in pixels to override those that would be
+        fitted for one tube
+
         :param exludeShortTubes: Exlude tubes shorter than specified length from calibration
         :param plotTube: List of tube indexes that will be ploted
         :param rangelist: list of the tube indexes that will be calibrated. Default None, means all the tubes in tubeSet
@@ -1119,6 +1286,7 @@ class Calibrate(PythonAlgorithm):
 
 
         This is the main method called from :func:`~tube.calibrate` to perform the calibration.
+
         """
         nTubes = tubeSet.getNumTubes()
         print("Number of tubes =", nTubes)
@@ -1134,10 +1302,12 @@ class Calibrate(PythonAlgorithm):
             wht, skipped = tubeSet.getTube(i)
             all_skipped.update(skipped)
 
-            print("Calibrating tube", i + 1, "of", nTubes, tubeSet.getTubeName(i))
+            print("Calibrating tube", i + 1, "of", nTubes,
+                  tubeSet.getTubeName(i))
             if (len(wht) < 1):
-                print("Unable to get any workspace indices (spectra) for this tube. Tube", tubeSet.getTubeName(i),
-                    "not calibrated.")
+                print(
+                    "Unable to get any workspace indices (spectra) for this tube. Tube",
+                    tubeSet.getTubeName(i), "not calibrated.")
                 # skip this tube
                 continue
 
@@ -1157,14 +1327,21 @@ class Calibrate(PythonAlgorithm):
                 # find the peaks positions
                 plotThisTube = i in plotTube
                 # RKH add meanC
-                actualTube, meanC = self.getPoints(ws, iTube.getFunctionalForms(), fitPar, wht, showPlot=plotThisTube)
+                actualTube, meanC = self.getPoints(ws,
+                                                   iTube.getFunctionalForms(),
+                                                   fitPar,
+                                                   wht,
+                                                   showPlot=plotThisTube)
                 if plotThisTube:
-                    RenameWorkspace('FittedData', OutputWorkspace='FittedTube%d' % (i))
-                    RenameWorkspace('TubePlot', OutputWorkspace='TubePlot%d' % (i))
+                    RenameWorkspace('FittedData',
+                                    OutputWorkspace='FittedTube%d' % (i))
+                    RenameWorkspace('TubePlot',
+                                    OutputWorkspace='TubePlot%d' % (i))
 
             # Set the peak positions at the peakTable
             #  RKH add meanC to end
-            # note for SANS2d we only call one tube at a time, as the number of edges (peaks) varies tube to tube and thus addRow does not work!
+            # note for SANS2d we only call one tube at a time, as the
+            # number of edges (peaks) varies tube to tube and thus addRow does not work!
             peaksTable.addRow([tubeSet.getTubeName(i)] + list(actualTube))
             print("meanC", meanC)
             meanCTable.addRow([tubeSet.getTubeName(i)] + list(meanC))
@@ -1173,19 +1350,29 @@ class Calibrate(PythonAlgorithm):
             # Define the correct position of detectors
             ##########################################
 
-            detIDList, detPosList = self.getCalibratedPixelPositions_RKH(ws, actualTube, iTube.getArray(), wht, peaksTestMode,
-                                                                         polinFit)
+            detIDList, detPosList = self.getCalibratedPixelPositions_RKH(
+                ws, actualTube, iTube.getArray(), wht, peaksTestMode, polinFit)
             # save the detector positions to calibTable
             if (len(detIDList) == len(wht)):  # We have corrected positions
                 for j in range(len(wht)):
-                    nextRow = {'Detector ID': detIDList[j], 'Detector Position': detPosList[j]}
+                    nextRow = {
+                        'Detector ID': detIDList[j],
+                        'Detector Position': detPosList[j]
+                    }
                     calibTable.addRow(nextRow)
 
         if len(all_skipped) > 0:
-            print("%i histogram(s) were excluded from the calibration since they did not have an assigned detector." % len(all_skipped))
+            print(
+                "%i histogram(s) were excluded from the calibration since they did not have an assigned detector."
+                % len(all_skipped))
 
-    def createTubeCalibtationWorkspaceByWorkspaceIndexList(self, integratedWorkspace, outputWorkspace, workspaceIndexList,
-                                                        xUnit='Pixel', showPlot=False):
+    def createTubeCalibtationWorkspaceByWorkspaceIndexList(
+            self,
+            integratedWorkspace,
+            outputWorkspace,
+            workspaceIndexList,
+            xUnit='Pixel',
+            showPlot=False):
         """
         Creates workspace with integrated data for one tube against distance along tube
         The tube is specified by a list of workspace indices of its spectra
@@ -1211,18 +1398,18 @@ class Calibrate(PythonAlgorithm):
             pixel = pixel + 1
             integratedPixelCounts.append(integratedWorkspace.dataY(i)[0])
 
-        CreateWorkspace(dataX=pixelNumbers, dataY=integratedPixelCounts, OutputWorkspace=outputWorkspace)
+        CreateWorkspace(dataX=pixelNumbers,
+                        dataY=integratedPixelCounts,
+                        OutputWorkspace=outputWorkspace)
         # if (showPlot):
         # plotSpectrum(outputWorkspace,0)
         # For some reason plotSpectrum is not recognised, but instead we can plot this worspace afterwards.
-
 
     # Return the udet number and [x,y,z] position of the detector (or virtual detector) corresponding to spectra spectra_number
     # Thanks to Pascal Manuel for this function
     def get_detector_pos(self, work_handle, spectra_number):
         udet = work_handle.getDetector(spectra_number)
         return udet.getID(), udet.getPos()
-
 
     # Given the center of a slit in pixels return the interpolated y
     #  Converts from pixel coords to Y.
@@ -1233,29 +1420,33 @@ class Calibrate(PythonAlgorithm):
     def get_ypos(self, work_handle, pixel_float):
         center_low_pixel = int(math.floor(pixel_float))
         center_high_pixel = int(math.ceil(pixel_float))
-        idlow, low = self.get_detector_pos(work_handle, center_low_pixel)  # Get the detector position of the nearest lower pixel
-        idhigh, high = self.get_detector_pos(work_handle,
-                                        center_high_pixel)  # Get the detector position of the nearest higher pixel
-        center_y = (center_high_pixel - pixel_float) * low.getY() + (pixel_float - center_low_pixel) * high.getY()
+        idlow, low = self.get_detector_pos(
+            work_handle, center_low_pixel
+        )  # Get the detector position of the nearest lower pixel
+        idhigh, high = self.get_detector_pos(
+            work_handle, center_high_pixel
+        )  # Get the detector position of the nearest higher pixel
+        center_y = (center_high_pixel - pixel_float) * low.getY() + (
+            pixel_float - center_low_pixel) * high.getY()
         center_y /= (center_high_pixel - center_low_pixel)
         return center_y
 
-
-    def fitGaussianParams(self, height, centre, sigma):  # Compose string argument for fit
+    def fitGaussianParams(self, height, centre,
+                          sigma):  # Compose string argument for fit
         # print "name=Gaussian, Height="+str(height)+", PeakCentre="+str(centre)+", Sigma="+str(sigma)
-        return "name=Gaussian, Height=" + str(height) + ", PeakCentre=" + str(centre) + ", Sigma=" + str(sigma)
-
+        return "name=Gaussian, Height=" + str(height) + ", PeakCentre=" + str(
+            centre) + ", Sigma=" + str(sigma)
 
     def fitEndErfcParams(self, B, C):  # Compose string argument for fit
         # print "name=EndErfc, B="+str(B)+", C="+str(C)
         return "name=EndErfc, B=" + str(B) + ", C=" + str(C)
 
-
     # RKH 11/11/19
-    def fitFlatTopPeakParams(self, centre, endGrad, width):  # Compose string argument for fit
+    def fitFlatTopPeakParams(self, centre, endGrad,
+                             width):  # Compose string argument for fit
         # print "name=EndErfc, B="+str(B)+", C="+str(C)
-        return "name=FlatTopPeak, Centre=" + str(centre) + ", endGrad=" + str(endGrad) + ", Width=" + str(width)
-
+        return "name=FlatTopPeak, Centre=" + str(centre) + ", endGrad=" + str(
+            endGrad) + ", Width=" + str(width)
 
     #
     # definition of the functions to fit
@@ -1277,10 +1468,12 @@ class Calibrate(PythonAlgorithm):
         end = min(int(centre + inedge + margin), RIGHTLIMIT)
         width = (end - start) / 3.0
         # print('start,end,width,margin',start,end,width,margin)
-        Fit(InputWorkspace=ws, Function=self.fitFlatTopPeakParams(centre, endGrad, width), StartX=str(start), EndX=str(end),
+        Fit(InputWorkspace=ws,
+            Function=self.fitFlatTopPeakParams(centre, endGrad, width),
+            StartX=str(start),
+            EndX=str(end),
             Output=outputWs)
         return 1  # peakIndex (center) is in position 1 of parameter list -> parameter B of fitFlatTopPeak
-
 
     def fitEdges(self, fitPar, index, ws, outputWs):
         # find the edge position
@@ -1291,7 +1484,8 @@ class Calibrate(PythonAlgorithm):
         all_values = ws.dataY(0)
         RIGHTLIMIT = len(all_values)
         # RKH 18/9/19, add int()
-        values = all_values[max(int(centre - margin), 0):min(int(centre + margin), len(all_values))]
+        values = all_values[max(int(centre - margin), 0
+                                ):min(int(centre + margin), len(all_values))]
 
         # identify if the edge is a sloping edge or descent edge
         descentMode = values[0] > values[-1]
@@ -1303,10 +1497,12 @@ class Calibrate(PythonAlgorithm):
             start = max(centre - inedge, 0)
             end = min(centre + outedge, RIGHTLIMIT)
             edgeMode = 1
-        Fit(InputWorkspace=ws, Function=fitEndErfcParams(centre, endGrad * edgeMode), StartX=str(start), EndX=str(end),
+        Fit(InputWorkspace=ws,
+            Function=fitEndErfcParams(centre, endGrad * edgeMode),
+            StartX=str(start),
+            EndX=str(end),
             Output=outputWs)
         return 1  # peakIndex (center) is in position 1 of parameter list -> parameter B of EndERFC
-
 
     def fitGaussian(self, fitPar, index, ws, outputWs):
         # find the peak position
@@ -1351,10 +1547,13 @@ class Calibrate(PythonAlgorithm):
             end = min(centre + margin, RIGHTLIMIT)
 
             fit_msg = 'name=LinearBackground,A0=%f;name=Gaussian,Height=%f,PeakCentre=%f,Sigma=%f' % (
-            background, height, centre, width)
+                background, height, centre, width)
 
-            Fit(InputWorkspace=ws, Function=fit_msg,
-                StartX=str(start), EndX=str(end), Output=outputWs)
+            Fit(InputWorkspace=ws,
+                Function=fit_msg,
+                StartX=str(start),
+                EndX=str(end),
+                Output=outputWs)
 
             peakIndex = 3
 
@@ -1368,18 +1567,30 @@ class Calibrate(PythonAlgorithm):
             # fit the input data as a linear background + gaussian fit
             # it was seen that the best result for static general fitParamters,
             # is to divide the values in two fitting steps
-            Fit(InputWorkspace=ws, Function='name=LinearBackground,A0=%f' % (background),
-                StartX=str(start), EndX=str(end), Output='Z1')
+            Fit(InputWorkspace=ws,
+                Function='name=LinearBackground,A0=%f' % (background),
+                StartX=str(start),
+                EndX=str(end),
+                Output='Z1')
             Fit(InputWorkspace='Z1_Workspace',
-                Function='name=Gaussian,Height=%f,PeakCentre=%f,Sigma=%f' % (height, centre, width),
-                WorkspaceIndex=2, StartX=str(start), EndX=str(end), Output=outputWs)
-            CloneWorkspace(outputWs + '_Workspace', OutputWorkspace='gauss_' + str(index))
+                Function='name=Gaussian,Height=%f,PeakCentre=%f,Sigma=%f' %
+                (height, centre, width),
+                WorkspaceIndex=2,
+                StartX=str(start),
+                EndX=str(end),
+                Output=outputWs)
+            CloneWorkspace(outputWs + '_Workspace',
+                           OutputWorkspace='gauss_' + str(index))
             peakIndex = 1
 
         return peakIndex
 
-
-    def getPoints(self, IntegratedWorkspace, funcForms, fitParams, whichTube, showPlot=False):
+    def getPoints(self,
+                  IntegratedWorkspace,
+                  funcForms,
+                  fitParams,
+                  whichTube,
+                  showPlot=False):
         """
         Get the centres of N slits or edges for calibration
 
@@ -1401,10 +1612,13 @@ class Calibrate(PythonAlgorithm):
 
         # Create input workspace for fitting
         ## get all the counts for the integrated workspace inside the tube
-        countsY = np.array([IntegratedWorkspace.dataY(i)[0] for i in whichTube])
+        countsY = np.array(
+            [IntegratedWorkspace.dataY(i)[0] for i in whichTube])
         if (len(countsY) == 0):
             return
-        getPointsWs = CreateWorkspace(list(range(len(countsY))), countsY, OutputWorkspace='TubePlot')
+        getPointsWs = CreateWorkspace(list(range(len(countsY))),
+                                      countsY,
+                                      OutputWorkspace='TubePlot')
         calibPointWs = 'CalibPoint'
         results = []
         fitt_y_values = []
@@ -1420,7 +1634,8 @@ class Calibrate(PythonAlgorithm):
             if funcForms[i] == 3:
                 # find the FlatTopPeak position
                 # RKH try save the fit params to get avg resolution
-                peakIndex = self.fitFlatTopPeak(fitParams, i, getPointsWs, calibPointWs)
+                peakIndex = self.fitFlatTopPeak(fitParams, i, getPointsWs,
+                                                calibPointWs)
 
                 cc = list(mtd[calibPointWs + '_Parameters'].row(2).items())[1][1]
                 temp.append(cc)
@@ -1440,7 +1655,8 @@ class Calibrate(PythonAlgorithm):
                     j += 1
                     mean += cc
             else:
-                peakIndex = self.fitGaussian(fitParams, i, getPointsWs, calibPointWs)
+                peakIndex = self.fitGaussian(fitParams, i, getPointsWs,
+                                             calibPointWs)
             # get the peak centre
             peakCentre = list(mtd[calibPointWs + '_Parameters'].row(peakIndex).items())[1][1]
             results.append(peakCentre)
@@ -1460,10 +1676,9 @@ class Calibrate(PythonAlgorithm):
         #
         if showPlot:
             FittedData = CreateWorkspace(np.hstack(fitt_x_values),
-                                        np.hstack(fitt_y_values))
+                                         np.hstack(fitt_y_values))
         # RKH return meanC also
         return results, meanC
-
 
     def getIdealTubeFromNSlits(self, IntegratedWorkspace, slits):
         """
@@ -1480,11 +1695,12 @@ class Calibrate(PythonAlgorithm):
         # print "slits for ideal tube", slits
         for i in range(len(slits)):
             # print slits[i]
-            ideal.append(self.get_ypos(IntegratedWorkspace, slits[i]))  # Use Pascal Manuel's Y conversion.
+            ideal.append(
+                self.get_ypos(IntegratedWorkspace,
+                              slits[i]))  # Use Pascal Manuel's Y conversion.
 
         # print "Ideal Tube",ideal
         return ideal
-
 
     def correctTube(self, AP, BP, CP, nDets):
         """
@@ -1513,13 +1729,19 @@ class Calibrate(PythonAlgorithm):
         xBinNew = []
         for i in range(nDets):
             xo = x[i]
-            xBinNew.append(xo + (xo * (nDets - xo) * GainError))  # Final bin position values corrected for offsets and gain
+            xBinNew.append(
+                xo + (xo * (nDets - xo) * GainError)
+            )  # Final bin position values corrected for offsets and gain
 
         # print xBinNew
         return xBinNew
 
-
-    def correctTubeToIdealTube(self, tubePoints, idealTubePoints, nDets, TestMode=False, polinFit=2):
+    def correctTubeToIdealTube(self,
+                               tubePoints,
+                               idealTubePoints,
+                               nDets,
+                               TestMode=False,
+                               polinFit=2):
         """
         Corrects position errors in a tube given an array of points and their ideal positions.
 
@@ -1539,8 +1761,9 @@ class Calibrate(PythonAlgorithm):
 
         # Check the arguments
         if (len(tubePoints) != len(idealTubePoints)):
-            print("Number of points in tube", len(tubePoints), "must equal number of points in ideal tube",
-                len(idealTubePoints))
+            print("Number of points in tube", len(tubePoints),
+                  "must equal number of points in ideal tube",
+                  len(idealTubePoints))
             return xResult
 
         # Filter out rogue slit points
@@ -1556,7 +1779,8 @@ class Calibrate(PythonAlgorithm):
 
         # State number of rogue slit points, if any
         if (len(tubePoints) != len(usedTubePoints)):
-            print("Only", len(usedTubePoints), "out of", len(tubePoints), " slit points used. Missed", missedTubePoints)
+            print("Only", len(usedTubePoints), "out of", len(tubePoints),
+                  " slit points used. Missed", missedTubePoints)
 
         # Check number of usable points
         if (len(usedTubePoints) < 3):
@@ -1564,10 +1788,15 @@ class Calibrate(PythonAlgorithm):
             return []
 
         # Fit quadratic to ideal tube points
-        CreateWorkspace(dataX=usedTubePoints, dataY=usedIdealTubePoints, OutputWorkspace="PolyFittingWorkspace")
+        CreateWorkspace(dataX=usedTubePoints,
+                        dataY=usedIdealTubePoints,
+                        OutputWorkspace="PolyFittingWorkspace")
         try:
-            Fit(InputWorkspace="PolyFittingWorkspace", Function='name=Polynomial,n=%d' % (polinFit), StartX=str(0.0),
-                EndX=str(nDets), Output="QF")
+            Fit(InputWorkspace="PolyFittingWorkspace",
+                Function='name=Polynomial,n=%d' % (polinFit),
+                StartX=str(0.0),
+                EndX=str(nDets),
+                Output="QF")
         except:
             print("Fit failed")
             return []
@@ -1592,8 +1821,13 @@ class Calibrate(PythonAlgorithm):
         # print xResult
         return xResult
 
-
-    def getCalibratedPixelPositions_RKH(self, ws, tubePts, idealTubePts, whichTube, peakTestMode=False, polinFit=2):
+    def getCalibratedPixelPositions_RKH(self,
+                                        ws,
+                                        tubePts,
+                                        idealTubePts,
+                                        whichTube,
+                                        peakTestMode=False,
+                                        polinFit=2):
         """
         Get the calibrated detector positions for one tube
         The tube is specified by a list of workspace indices of its spectra
@@ -1618,7 +1852,11 @@ class Calibrate(PythonAlgorithm):
             return detIDs, detPositions
 
             # Correct positions of detectors in tube by quadratic fit
-        pixels = self.correctTubeToIdealTube(tubePts, idealTubePts, nDets, TestMode=peakTestMode, polinFit=polinFit)
+        pixels = self.correctTubeToIdealTube(tubePts,
+                                             idealTubePts,
+                                             nDets,
+                                             TestMode=peakTestMode,
+                                             polinFit=polinFit)
         # print pixels
         if (len(pixels) != nDets):
             print("Tube correction failed.")
@@ -1628,7 +1866,8 @@ class Calibrate(PythonAlgorithm):
         # get the detector from the baseInstrument, in order to get the positions
         # before any calibration being loaded.
         det0 = baseInstrument.getDetector(ws.getDetector(whichTube[0]).getID())
-        detN = baseInstrument.getDetector(ws.getDetector(whichTube[-1]).getID())
+        detN = baseInstrument.getDetector(
+            ws.getDetector(whichTube[-1]).getID())
         d0pos, dNpos = det0.getPos(), detN.getPos()
         ## identical to norm of vector: |dNpos - d0pos|
         tubeLength = det0.getDistance(detN)
@@ -1662,45 +1901,6 @@ class Calibrate(PythonAlgorithm):
 
         return detIDs, detPositions
 
-
-    def readPeakFile(file_name):
-        """Load the file calibration
-
-        It returns a list of tuples, where the first value is the detector identification
-        and the second value is its calibration values.
-
-        Example of usage:
-            for (det_code, cal_values) in readPeakFile('pathname/TubeDemo'):
-                print det_code
-                print cal_values
-
-        """
-        loaded_file = []
-        # split the entries to the main values:
-        # For example:
-        # MERLIN/door1/tube_1_1 [34.199347724575574, 525.5864438725401, 1001.7456248836971]
-        # Will be splited as:
-        # ['MERLIN/door1/tube_1_1', '', '34.199347724575574', '', '525.5864438725401', '', '1001.7456248836971', '', '', '']
-        pattern = re.compile('[\[\],\s\r]')
-        saveDirectory = config['defaultsave.directory']
-        pfile = os.path.join(saveDirectory, file_name)
-        for line in open(pfile, 'r'):
-            # check if the entry is a comment line
-            if line.startswith('#'):
-                continue
-                # split all values
-            line_vals = re.split(pattern, line)
-            id_ = line_vals[0]
-            if id_ == '':
-                continue
-            try:
-                f_values = [float(v) for v in line_vals[1:] if v != '']
-            except ValueError:
-                # print 'Wrong format: we expected only numbers, but receive this line ',str(line_vals[1:])
-                continue
-
-            loaded_file.append((id_, f_values))
-        return loaded_file
 
 # Register algorithm with Mantid
 AlgorithmFactory.subscribe(Calibrate)
