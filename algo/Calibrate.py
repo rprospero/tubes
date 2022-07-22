@@ -44,14 +44,6 @@ class Calibrate(PythonAlgorithm):
         5:   [0.4787643, 0.516942465]}
 
     @staticmethod
-    def _parse_strip(description):
-        """Parse a pair of strip edge position and file name"""
-        parts = description.split("=")
-        if len(parts) != 2:
-            raise RuntimeError("Cannot part strip run '{}'.  Expecting a string in the format of '920=SANS2D00064390.nxs', where 920 is the strip position and SANS2D00064390.nxs is the file name")
-        return (int(parts[0]), parts[1])
-
-    @staticmethod
     def multiply_ws_list(ws_list, output_ws_name):
         print("Multiplying workspaces together...")
         it = iter(ws_list)
@@ -185,11 +177,16 @@ class Calibrate(PythonAlgorithm):
     def PyInit(self):
         # Declare properties
         self.declareProperty('StripPositions',
-                             ["920=SANS2D00064390.nxs",
-                              "755=SANS2D00064391.nxs",
-                              "590=SANS2D00064392.nxs",
-                              "425=SANS2D00064393.nxs",
-                              "260=SANS2D00064388.nxs"],
+                             #[1040, 920, 755, 590, 425, 260, 95, 5],
+                             [920, 755, 590, 425, 260],
+                             direction=Direction.Input,
+                             doc="Which strip positions were used for which runs")
+        self.declareProperty('DataFiles',
+                             ["SANS2D00064390.nxs",
+                              "SANS2D00064391.nxs",
+                              "SANS2D00064392.nxs",
+                              "SANS2D00064393.nxs",
+                              "SANS2D00064388.nxs"],
                              direction=Direction.Input,
                              doc="Which strip positions were used for which runs")
         self.declareProperty('RearDetector', True, direction=Direction.Input,
@@ -211,6 +208,20 @@ class Calibrate(PythonAlgorithm):
         self.declareProperty('VerticalOffset', -0.005, direction=Direction.Input,
                              doc="Estimate of how many metres off-vertical the Cd strip is at bottom of the detector. Negative if strips are more to left at bottom than top of cylindrical Y plot.")
 
+    def validateInputs(self):
+        issues = dict()
+        files = len(self.getProperty("DataFiles").value)
+        positions = len(self.getProperty("StripPositions").value)
+
+        if positions > files:
+            issues["DataFiles"] = "There must be a measurement for each strip position."
+        if files > positions:
+            issues["StripPositions"] = "There must be a strip position for each measurement."
+        if self.getProperty("EndingPixel").value <= self.getProperty("StartingPixel").value:
+            issues["EndingPixel"] = "The ending pixel must have a greater index than the starting pixel."
+
+        return issues
+
     def PyExec(self):
         # Run the algorithm
         self.BACKGROUND = self.getProperty("Background").value
@@ -222,6 +233,8 @@ class Calibrate(PythonAlgorithm):
         ENDPIXEL = self.getProperty("EndingPixel").value
         FITEDGES = self.getProperty("FitEdges").value
         self.rear = self.getProperty("RearDetector").value
+        data_files = self.getProperty("DataFiles").value
+        known_edge_pairs = np.array([self._strip_edges[pos] for pos in self.getProperty("StripPositions").value])
 
 
         if self.rear:
@@ -232,11 +245,6 @@ class Calibrate(PythonAlgorithm):
             index1 = 120*512
             index2 = 2*120*512 -1
             detector_name = "front"
-
-        data_files = [self._parse_strip(x) for x in self.getProperty("StripPositions").value]
-
-        known_edge_pairs = np.array([self._strip_edges[x[0]] for x in data_files])
-        data_files = [x[1] for x in data_files]
 
         load_report = Progress(self, start=0, end=0.9, nreports=len(data_files))
         ws_list = [self.get_integrated_workspace(data_file, load_report) for data_file in data_files]
