@@ -1,8 +1,6 @@
 from mantid.kernel import *
 from mantid.api import *
-# from mantid.simpleapi import Load, Rebin, SaveNexusProcessed, RenameWorkspace, CropWorkspace, Scale, CloneWorkspace, Multiply, ApplyCalibration, CreateEmptyTableWorkspace, CreateWorkspace
 from mantid.simpleapi import *
-
 import itertools
 import numpy as np
 import os.path
@@ -12,6 +10,7 @@ import sys
 from tube_spec import TubeSpec
 from ideal_tube import IdealTube
 from tube_calib_fit_params import TubeCalibFitParams
+
 
 class TubeSide:
     LEFT = "left"
@@ -24,7 +23,9 @@ class TubeSide:
         else:
             return TubeSide.RIGHT
 
-INF = sys.float_info.max # Convenient approximation for infinity
+
+INF = sys.float_info.max  # Convenient approximation for infinity
+
 
 def pairwise(iterable):
     """Helper function from: http://docs.python.org/2/library/itertools.html:
@@ -33,9 +34,10 @@ def pairwise(iterable):
     next(b, None)
     return list(zip(a, b))
 
+
 class Calibrate(PythonAlgorithm):
     _strip_edges = {
-        1040: [-0.562365234,-0.524046455],
+        1040: [-0.562365234, -0.524046455],
         920: [-0.44052572, -0.402347555],
         755: [-0.27475211, -0.236573945],
         590: [-0.1089785, -0.070800335],
@@ -61,11 +63,12 @@ class Calibrate(PythonAlgorithm):
         tube_side_num = tube_id // 2  # Need int name, not float appended
         return detector_name + "-detector/" + side + str(tube_side_num)
 
-
     def get_tube_data(self, tube_id, ws, detector_name):
         tube_name = self.get_tube_name(tube_id, detector_name)
 
-        # Piggy-back the TubeSpec class from Karl's Calibration code so that dealing with tubes is easier than interrogating the IDF ourselves.
+        # Piggy-back the TubeSpec class from Karl's Calibration code
+        # so that dealing with tubes is easier than interrogating the
+        # IDF ourselves.
         tube_spec = TubeSpec(ws)
         tube_spec.setTubeSpecByString(tube_name)
         assert tube_spec.getNumTubes() == 1
@@ -178,10 +181,9 @@ class Calibrate(PythonAlgorithm):
     def PyInit(self):
         # Declare properties
         self.declareProperty('StripPositions',
-                             #[1040, 920, 755, 590, 425, 260, 95, 5],
-                             [920, 755, 590, 425, 260],
+                             [1040, 920, 755, 590, 425, 260, 95, 5],
                              direction=Direction.Input,
-                             doc="Which strip positions were used for which runs")
+                             doc="Which strip positions were used")
         self.declareProperty('DataFiles',
                              ["SANS2D00064390.nxs",
                               "SANS2D00064391.nxs",
