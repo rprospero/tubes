@@ -247,7 +247,7 @@ class Calibrate(PythonAlgorithm):
             index2 = 2*120*512 -1
             detector_name = "front"
 
-        load_report = Progress(self, start=0, end=0.5, nreports=len(data_files))
+        load_report = Progress(self, start=0, end=0.4, nreports=len(data_files))
         ws_list = [self.get_integrated_workspace(data_file, load_report) for data_file in data_files]
 
         # Scale workspaces
@@ -297,7 +297,7 @@ class Calibrate(PythonAlgorithm):
         # caltable = True
         diag_output = dict()
 
-        tube_report = Progress(self, start=0.5, end=1.0, nreports=120)
+        tube_report = Progress(self, start=0.4, end=0.9, nreports=120)
         for tube_id in range(120):
             # for tube_id in range(116,120):
             diag_output[tube_id] = []
@@ -435,6 +435,7 @@ class Calibrate(PythonAlgorithm):
         i1 = 0
         i2 = 512
         dx = (522.2 + 519.2) / 511
+        calib_report = Progress(self, start=0.9, end=1.0, nreports=nentries)
         for i in range(0, nentries):
             tube_num = mtd["CalibTable"].column("Detector ID")[i1]
             tube_num /= 1000
@@ -460,6 +461,7 @@ class Calibrate(PythonAlgorithm):
                                 OutputWorkspace="Shift" + str(tube_id) + "_" + str(module) + "_" + str(tube_num)))
             i1 = i1 + 512
             i2 = i2 + 512
+            calib_report.report("Calibrating")
 
         for tube_id, workspaces in diag_output.items():
             GroupWorkspaces(InputWorkspaces=workspaces, OutputWorkspace=f"Tube_{tube_id:03}")
