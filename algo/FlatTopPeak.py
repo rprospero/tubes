@@ -14,7 +14,7 @@ class FlatTopPeak(IFunction1D):
         self.declareParameter("endGrad", 3.0,
                               "The width of the transition between the base and the peak.")
         self.declareParameter("Background", 2500.0,
-                              "The baseline of the mesa.")
+                              "The baseline below the mesa.")
         self.declareParameter("Width", 20.0,
                               "The breadth of the top of the mesa.")
 
