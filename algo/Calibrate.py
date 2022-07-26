@@ -48,9 +48,8 @@ class Calibrate(PythonAlgorithm):
         5: [0.4787643, 0.516942465]
     }
 
-    @staticmethod
-    def multiply_ws_list(ws_list, output_ws_name):
-        print("Multiplying workspaces together...")
+    def multiply_ws_list(self, ws_list, output_ws_name):
+        self.log().information("Multiplying workspaces together...")
         it = iter(ws_list)
         total = str(next(it)) + '_scaled'
         for element in it:
@@ -134,27 +133,24 @@ class Calibrate(PythonAlgorithm):
         """Load a rebin a tube calibration run.  Searched multiple levels of cache to ensure faster loading."""
         # check to see if have this file already loaded
         ws_name = os.path.splitext(data_file)[0]
-        self.log().debug("look for:  {}".format(ws_name))
+        self.log().debug(f"look for: {ws_name}")
         try:
             ws = mtd[ws_name]
-            self.log().information(
-                "Using existing {} workspace".format(ws_name))
-            prog.report("Loading {}".format(ws_name))
+            self.log().information(f"Using existing {ws_name} workspace")
+            prog.report(f"Loading {ws_name}")
             return ws
         except:
             pass
         try:
             ws = Load(Filename="saved_" + data_file, OutputWorkspace=ws_name)
-            self.log().information(
-                "Loaded saved file from {}.".format("saved_" + data_file))
-            prog.report("Loading {}".format(ws_name))
+            self.log().information(f"Loaded saved file froms aved_{data_file}.")
+            prog.report(f"Loading {ws_name}")
             return ws
         except:
             pass
 
         ws = Load(Filename=data_file, OutputWorkspace=ws_name)
-        self.log().information(
-            "Loaded and integrating data from {}.".format(data_file))
+        self.log().information(f"Loaded and integrating data from {data_file}.")
         # turn event mode into histogram with a single bin
         ws = Rebin(ws, self.timebin, PreserveEvents=False)
         # else for histogram data use integration or sumpsectra
@@ -162,7 +158,7 @@ class Calibrate(PythonAlgorithm):
         SaveNexusProcessed(ws, "saved_" + data_file)
         RenameWorkspace(ws, ws_name)
 
-        prog.report("Loading {}".format(ws_name))
+        prog.report(f"Loading {ws_name}")
         return ws
 
     @staticmethod
@@ -335,8 +331,7 @@ class Calibrate(PythonAlgorithm):
 
         for ws, (boundary_start, boundary_end) in zip(ws_list,
                                                       pairwise(boundaries)):
-            print(("Isolating shadow in %s between boundaries %g and %g." %
-                   (str(ws), boundary_start, boundary_end)))
+            self.log().information(f"Isolating shadow in {ws} between boundaries {boundary_start} and {boundary_end}.")
             # set to 1 so that we can multiply all the shadows together, instead of running merged workspace 5 times.
             ws2 = str(ws) + '_scaled'
             self.set_counts_to_one_outside_x_range(mtd[ws2], boundary_start,
@@ -371,9 +366,9 @@ class Calibrate(PythonAlgorithm):
             diag_output[tube_id] = []
 
             tube_name = self.get_tube_name(tube_id, detector_name)
-            tube_report.report("Calculating tube {}".format(tube_name))
-            print("\n==================================================")
-            print(("ID = %i, Name = \"%s\"" % (tube_id, tube_name)))
+            tube_report.report(f"Calculating tube {tube_name}")
+            self.log().information("\n==================================================")
+            self.log().debug(f'ID = {tube_id}, Name = "{tube_name}"')
             known_edges1 = copy.copy(known_edges_left)
             if TubeSide.getTubeSide(tube_id) == TubeSide.LEFT:
                 # first pixel in mm, as per idf file for rear detector
@@ -395,8 +390,8 @@ class Calibrate(PythonAlgorithm):
             # Store the guesses for printing out later, along with the tube id and name.
             # pixel_guesses.append([tube_name, guessed_pixels])
 
-            print(), print((len(guessed_pixels), guessed_pixels))
-            print(), print((len(known_edges), known_edges))
+            self.log().debug(f"{len(guessed_pixels)} {guessed_pixels}")
+            self.log().debug(f"{len(known_edges)} {known_edges}")
 
             # note funcForm==2 fits an edge using error function, (see
             # SANS2DEndErfc above, and code in tube_calib_RKH.py,)
@@ -424,12 +419,12 @@ class Calibrate(PythonAlgorithm):
                                             outEdge=10.0,
                                             inEdge=10.0)
                 fitPar.setAutomatic(False)
-                print(("halved guess ", len(guessed_pixels), guessed_pixels))
-                print(("halved known ", len(known_edges), known_edges))
+                self.log().debug(f"halved guess {len(guessed_pixels)} {guessed_pixels}")
+                self.log().debug(f"halved known {len(known_edges)} {known_edges}")
 
             module = int(tube_id / 24) + 1
             tube_num = tube_id - (module - 1) * 24
-            print(("module ", module, "   tube ", tube_num))
+            self.log().debug(f"module {module}   tube {tube_num}")
 
             if caltable:
                 # does this after the first time, it appends to a table
@@ -448,7 +443,7 @@ class Calibrate(PythonAlgorithm):
                     calibTable=caltable)
             else:
                 # do this the FIRST time, starts a new table
-                print("first time, generate calib table")
+                self.log().debug("first time, generate calib table")
                 caltable, peakTable, meanCTable = self.calibrate(
                     result,
                     tube_name,
@@ -463,10 +458,10 @@ class Calibrate(PythonAlgorithm):
                     fitPar=fitPar)
             diag_output[tube_id].append(
                 CloneWorkspace(InputWorkspace="FittedTube0",
-                               OutputWorkspace="Fit{}_{}_{}".format(tube_id, module, tube_num)))
+                               OutputWorkspace=f"Fit{tube_id}_{module}_{tube_num}"))
             diag_output[tube_id].append(
                 CloneWorkspace(InputWorkspace="TubePlot0",
-                               OutputWorkspace="Tube{}_{}_{}".format(tube_id, module, tube_num)))
+                               OutputWorkspace=f"Tube{tube_id}_{module}_{tube_num}"))
             # 8/7/14 save the fitted positions to see how well the fit does, all in mm
             x_values = []
             x0_values = []
@@ -481,40 +476,40 @@ class Calibrate(PythonAlgorithm):
             cc = CreateWorkspace(DataX=x0_values, DataY=x_values)
             diag_output[tube_id].append(
                 RenameWorkspace(InputWorkspace=cc,
-                                OutputWorkspace="Data{}_{}_{}".format(tube_id, module, tube_num)))
+                                OutputWorkspace=f"Data{tube_id}_{module}_{tube_num}"))
 
             bb = list(mtd["meanCTable"].row(0).values())
             meanCvalue.append(bb[1])
             tubeList.append(tube_id)
 
         ApplyCalibration(result, caltable)
-        print(tubeList)
-        print(meanCvalue)
+        self.log().debug(str(tubeList))
+        self.log().debug(str(meanCvalue))
         cvalues = CreateWorkspace(DataX=tubeList, DataY=meanCvalue)
 
         # FIXME: This needs more information in the file name
         outputfilename = "TubeCalirbationTable_512pixel.nxs"
-        print(outputfilename)
+        self.log().debug(outputfilename)
         SaveNexusProcessed(result, outputfilename)
         # you will next need to run merge_calib_files.py to merge the tables for front and rear detectors
 
         # expts
         aa = mtd["PeakTable"].row(0)
-        print(aa)
-        print((aa.get('Peak10')))
+        self.log().debug(str(aa))
+        self.log().debug(str(aa.get('Peak10')))
         bb = list(aa.values())
 
         bb = list(mtd["PeakTable"].row(0).values())
         del bb[0]  # Remove string that can't be sorted
-        print(bb)
+        self.log().debug(str(bb))
         bb.sort()
-        print(bb)
+        self.log().debug(str(bb))
 
         # now interrogate CalibTable to see how much we have shifted pixels by for each tube
         # 18/3/15 this new version will work when we have skipped tubes as it reads the Detector ID's  from the table itself
         # All this creates ws to check results, doesn't affect the main code
         nentries = int(len(mtd["CalibTable"]) / 512)
-        print(("nentries in CalibTable = ", nentries))
+        self.log().information(f"nentries in CalibTable = {nentries}")
         i1 = 0
         i2 = 512
         dx = (522.2 + 519.2) / 511
@@ -527,7 +522,7 @@ class Calibrate(PythonAlgorithm):
             module = int(tube_num / 100)
             tube_num = tube_num - module * 100
             tube_id = (module - 1) * 24 + tube_num
-            print((tube_id, module, tube_num))
+            self.log().debug(f"{tube_id} {module} {tube_num}")
             x_values = []
             x0_values = []
             # use left tube value here for now, right tube starts at -522.2    WHY THIS HERE ????
@@ -542,7 +537,7 @@ class Calibrate(PythonAlgorithm):
             plotN = CreateWorkspace(DataX=x0_values, DataY=x_values)
             diag_output[i].append(
                 RenameWorkspace(InputWorkspace="plotN",
-                                OutputWorkspace="Shift{}_{}_{}".format(tube_id, module, tube_num)))
+                                OutputWorkspace=f"Shift{tube_id}_{module}_{tube_num}"))
             i1 = i1 + 512
             i2 = i2 + 512
             calib_report.report("Calibrating")
@@ -1290,7 +1285,7 @@ class Calibrate(PythonAlgorithm):
 
         """
         nTubes = tubeSet.getNumTubes()
-        print("Number of tubes =", nTubes)
+        self.log().debug(f"Number of tubes = {nTubes}")
 
         if rangeList is None:
             rangeList = list(range(nTubes))
@@ -1303,12 +1298,11 @@ class Calibrate(PythonAlgorithm):
             wht, skipped = tubeSet.getTube(i)
             all_skipped.update(skipped)
 
-            print("Calibrating tube", i + 1, "of", nTubes,
-                  tubeSet.getTubeName(i))
+            self.log().debug(f"Calibrating tube {i + 1} of {nTubes} {tubeSet.getTubeName(i)}")
             if (len(wht) < 1):
-                print(
-                    "Unable to get any workspace indices (spectra) for this tube. Tube",
-                    tubeSet.getTubeName(i), "not calibrated.")
+                self.log().debug(
+                    "Unable to get any workspace indices (spectra) for this tube. "
+                    f"Tube {tubeSet.getTubeName(i)} not calibrated.")
                 # skip this tube
                 continue
 
@@ -1344,7 +1338,7 @@ class Calibrate(PythonAlgorithm):
             # note for SANS2d we only call one tube at a time, as the
             # number of edges (peaks) varies tube to tube and thus addRow does not work!
             peaksTable.addRow([tubeSet.getTubeName(i)] + list(actualTube))
-            print("meanC", meanC)
+            self.log().debug(f"meanC {meanC}")
             meanCTable.addRow([tubeSet.getTubeName(i)] + list(meanC))
 
             ##########################################
@@ -1363,9 +1357,8 @@ class Calibrate(PythonAlgorithm):
                     calibTable.addRow(nextRow)
 
         if len(all_skipped) > 0:
-            print(
-                "%i histogram(s) were excluded from the calibration since they did not have an assigned detector."
-                % len(all_skipped))
+            self.log().debug(
+                f"{len(all_skipped)} histogram(s) were excluded from the calibration since they did not have an assigned detector.")
 
     def createTubeCalibtationWorkspaceByWorkspaceIndexList(
             self,
@@ -1457,7 +1450,6 @@ class Calibrate(PythonAlgorithm):
         # find the edge position
         centre = fitPar.getPeaks()[index]
         outedge, inedge, endGrad = fitPar.getEdgeParameters()
-        # print('outedge, inedge, endGrad ',outedge, inedge, endGrad )
         margin = fitPar.getMargin()
         # get values around the expected center
         all_values = ws.dataY(0)
@@ -1468,7 +1460,6 @@ class Calibrate(PythonAlgorithm):
         start = max(int(centre - outedge - margin), 0)
         end = min(int(centre + inedge + margin), RIGHTLIMIT)
         width = (end - start) / 3.0
-        # print('start,end,width,margin',start,end,width,margin)
         Fit(InputWorkspace=ws,
             Function=self.fitFlatTopPeakParams(centre, endGrad, width),
             StartX=str(start),
@@ -1673,7 +1664,7 @@ class Calibrate(PythonAlgorithm):
         #  meanC = CreateSingleValuedWorkspace(Datavalue=mean)  this did not work
         meanC.append(mean)
         # RKH
-        print("C values = ", temp)
+        self.log().debug(f"C values = {temp}")
         #
         if showPlot:
             FittedData = CreateWorkspace(np.hstack(fitt_x_values),
@@ -1762,9 +1753,7 @@ class Calibrate(PythonAlgorithm):
 
         # Check the arguments
         if (len(tubePoints) != len(idealTubePoints)):
-            print("Number of points in tube", len(tubePoints),
-                  "must equal number of points in ideal tube",
-                  len(idealTubePoints))
+            self.log().debug(f"Number of points in tube {len(tubePoints)} must equal number of points in ideal tube {len(idealTubePoints)}")
             return xResult
 
         # Filter out rogue slit points
@@ -1780,12 +1769,11 @@ class Calibrate(PythonAlgorithm):
 
         # State number of rogue slit points, if any
         if (len(tubePoints) != len(usedTubePoints)):
-            print("Only", len(usedTubePoints), "out of", len(tubePoints),
-                  " slit points used. Missed", missedTubePoints)
+            self.log().debug(f"Only {len(usedTubePoints)} out of {len(tubePoints)} slit points used. Missed {missedTubePoints}")
 
         # Check number of usable points
         if (len(usedTubePoints) < 3):
-            print("Too few usable points in tube", len(usedTubePoints))
+            self.log().debug(f"Too few usable points in tube {len(usedTubePoints)}")
             return []
 
         # Fit quadratic to ideal tube points
@@ -1799,7 +1787,7 @@ class Calibrate(PythonAlgorithm):
                 EndX=str(nDets),
                 Output="QF")
         except:
-            print("Fit failed")
+            self.log().debug("Fit failed")
             return []
 
         paramQF = mtd['QF_Parameters']
@@ -1814,7 +1802,7 @@ class Calibrate(PythonAlgorithm):
         # In test mode, shove the pixels that are closest to the reckoned peaks
         # to the position of the first detector so that the resulting gaps can be seen.
         if (TestMode):
-            print("TestMode code")
+            self.log().debug("TestMode code")
             for i in range(len(usedTubePoints)):
                 # print "used point",i,"shoving pixel",int(usedTubePoints[i])
                 xResult[int(usedTubePoints[i])] = xResult[0]
@@ -1860,7 +1848,7 @@ class Calibrate(PythonAlgorithm):
                                              polinFit=polinFit)
         # print pixels
         if (len(pixels) != nDets):
-            print("Tube correction failed.")
+            self.log().debug("Tube correction failed.")
             return detIDs, detPositions
         baseInstrument = ws.getInstrument().getBaseInstrument()
         # Get tube unit vector
@@ -1873,7 +1861,7 @@ class Calibrate(PythonAlgorithm):
         ## identical to norm of vector: |dNpos - d0pos|
         tubeLength = det0.getDistance(detN)
         if (tubeLength <= 0.0):
-            print("Zero length tube cannot be calibrated, calibration failed.")
+            self.log().error("Zero length tube cannot be calibrated, calibration failed.")
             return detIDs, detPositions
         # unfortunatelly, the operation '/' is not defined in V3D object, so
         # I have to use the multiplication.
@@ -1886,7 +1874,7 @@ class Calibrate(PythonAlgorithm):
         kill = V3D(0.0, 1.0, 1.0)
         center = center * kill
         # RKH added print 9/7/14
-        print("center= ", center, "  unit vector= ", unit_vector)
+        self.log().debug(f"center={center},  unit vector= {unit_vector}")
         # Move the pixel detectors (might not work for sloping tubes)
         for i in range(nDets):
             deti = ws.getDetector(whichTube[i])
