@@ -36,7 +36,13 @@ def pairwise(iterable):
     return list(zip(a, b))
 
 
-class Calibrate(PythonAlgorithm):
+class SANSTubeCalibration(PythonAlgorithm):
+    def category(self):
+        return 'SANS\\Calibration'
+
+    def summary(self):
+        return 'Calibrates the tubes on the ISIS Sans2d Detector.'
+
     _strip_edges = {
         1040: [-0.562365234, -0.524046455],
         920: [-0.44052572, -0.402347555],
@@ -185,9 +191,6 @@ class Calibrate(PythonAlgorithm):
         boundaries.append(INF)
 
         return edge_pairs_merged, boundaries
-
-    def category(self):
-        return 'SANS\\TubeCalibration'
 
     def PyInit(self):
         # Declare properties
@@ -1892,4 +1895,4 @@ class Calibrate(PythonAlgorithm):
 
 
 # Register algorithm with Mantid
-AlgorithmFactory.subscribe(Calibrate)
+AlgorithmFactory.subscribe(SANSTubeCalibration)
