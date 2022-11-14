@@ -21,13 +21,22 @@ class SANSTubeMerge(PythonAlgorithm):
 
     def PyExec(self):
         # Run the algorithm
-        data_files = self.getProperty("DataFiles").value
-
+        load_report = Progress(self,
+                               start=0.0,
+                               end=0.5,
+                               nreports=2)
+        load_report.report("Loading Rear")
         rear_calib = Load(self.getProperty("Rear").value)
+        load_report.report("Loading Front")
         front_calib = Load(self.getProperty("Front").value)
 
         det_id_list = []
+        load_report = Progress(self,
+                               start=0.5,
+                               end=0.75,
+                               nreports=rear_calib.getNumberHistograms())
         for ws_index in range(rear_calib.getNumberHistograms()):
+                load_report.report(f"Loading {ws_index}")
                 spectrum = rear_calib.getSpectrum(ws_index)
                 if spectrum.getSpectrumNo() < 0:
                         continue
@@ -46,7 +55,12 @@ class SANSTubeMerge(PythonAlgorithm):
         move.setProperty("Workspace", "front_calib")
         move.setProperty("RelativePosition", False)
 
+        load_report = Progress(self,
+                               start=0.75,
+                               end=1.0,
+                               nreports=len(det_id_list))
         for det_id in det_id_list:
+                load_report.report(f"Gettings Detector {det_id}")
                 det = rear_inst.getDetector(det_id)
                 if "rear-detector" in det.getFullName():
                         move.setProperty("DetectorID", det_id)
