@@ -252,6 +252,9 @@ class SANSTubeCalibration(PythonAlgorithm):
             "Estimate of how many metres off-vertical the Cd strip is at bottom of the detector. "
             "Negative if strips are more to left at bottom than top of cylindrical Y plot."
         )
+        self.declareProperty(FileProperty(name="OutputFile",  defaultValue="",
+                                          action=FileAction.Save,
+                                          extensions=["nxs"]))
 
     def validateInputs(self):
         issues = dict()
@@ -287,6 +290,7 @@ class SANSTubeCalibration(PythonAlgorithm):
             self._strip_edges[pos]
             for pos in self.getProperty("StripPositions").value
         ])
+        self.outputfile = self.getProperty("OutputFile").value
 
         if self.rear:
             index1 = 0
@@ -490,10 +494,7 @@ class SANSTubeCalibration(PythonAlgorithm):
         self.log().debug(str(meanCvalue))
         cvalues = CreateWorkspace(DataX=tubeList, DataY=meanCvalue)
 
-        # FIXME: This needs more information in the file name
-        outputfilename = "TubeCalirbationTable_512pixel.nxs"
-        self.log().debug(outputfilename)
-        SaveNexusProcessed(result, outputfilename)
+        SaveNexusProcessed(result, self.outputfile)
         # you will next need to run merge_calib_files.py to merge the tables for front and rear detectors
 
         # expts
