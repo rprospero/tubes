@@ -12,14 +12,12 @@ class SANSTubeMerge(PythonAlgorithm):
 
     def PyInit(self):
         # Declare properties
-        self.declareProperty(
-            'Front',  "TubeCalibrationTable_512pixel_64393front_TEST.nxs",
-            direction=Direction.Input,
-            doc="Calibration Table for the front detector")
-        self.declareProperty(
-            'Rear',  "TubeCalibrationTable_512pixel_64393rear_TEST.nxs",
-            direction=Direction.Input,
-            doc="Calibration Table for the front detector")
+        self.declareProperty(FileProperty(name="Front", defaultValue="",
+                                          action=FileAction.Load,
+                                          extensions=["nxs"]))
+        self.declareProperty(FileProperty(name="Rear", defaultValue="",
+                                          action=FileAction.Load,
+                                          extensions=["nxs"]))
 
     def PyExec(self):
         # Run the algorithm
